@@ -5,13 +5,14 @@ Run separately from the Python unit suite: requires Playwright and system Chrome
 from __future__ import annotations
 import hashlib
 import json
+import re
 from pathlib import Path
 import shutil
 import subprocess
 import tempfile
 import zipfile
 
-from playwright.sync_api import sync_playwright
+from playwright.sync_api import sync_playwright, expect
 
 ROOT = Path(__file__).resolve().parents[1]
 RUN_URL = 'https://github.com/usedhonda/security-review/actions/runs/123456789'
@@ -51,7 +52,7 @@ def main() -> None:
         page.locator('#clear').click()
         assert page.locator('#recipient').input_value() == ''
         page.locator('#identity').set_input_files(identity)
-        page.wait_for_function("document.getElementById('recipient').value.startsWith('age1')")
+        expect(page.locator('#recipient')).to_have_value(public_key)
         assert page.locator('#recipient').input_value() == public_key
         provenance = {'repository': 'usedhonda/security-review', 'run_id': '123456789', 'run_attempt': '1', 'workflow_commit': 'a'*40, 'kind': 'probe', 'step_outcome': 'success', 'recipient_sha256': hashlib.sha256(public_key.encode()).hexdigest()}
         probe = {'format': 'security-review.age-bundle.v1', 'provenance': provenance, 'summary_json': json.dumps({'schema_version': 1, 'status': 'recovery_probe', 'api_calls': 0}), 'summary_markdown': 'Recovery succeeded'}
@@ -63,7 +64,7 @@ def main() -> None:
         page.locator('#run-url').fill(RUN_URL+'?check_suite_focus=true#artifacts')
         page.locator('#cipher').set_input_files(cipher)
         page.locator('#open-report').click()
-        page.wait_for_function("!document.getElementById('result').hidden")
+        expect(page.locator('#result')).to_be_visible()
         assert page.locator('#result-title').inner_text() == '回収テストに成功しました'
         for method in (zipfile.ZIP_STORED, zipfile.ZIP_DEFLATED):
             path = temp/'encrypted-review-123456789-1.zip'
@@ -71,14 +72,15 @@ def main() -> None:
                 archive.writestr('report.json.age', cipher.read_bytes())
             page.locator('#cipher').set_input_files(path)
             page.locator('#open-report').click()
-            page.wait_for_function("!document.getElementById('result').hidden")
+            expect(page.locator('#result')).to_be_visible()
         # Wrong run, incorrect explicit SHA, wrong key and corrupt/truncated files fail closed.
         def expect_failure():
             page.locator('#open-report').click()
-            page.wait_for_function("document.getElementById('report-status').classList.contains('error')")
+            expect(page.locator('#report-status')).to_have_class(re.compile(r'error'))
             assert page.locator('#result').is_hidden()
         page.locator('#run-url').fill(RUN_URL+'0');expect_failure()
         page.locator('#run-url').fill(RUN_URL)
+        page.get_by_text('再実行・詳しい照合（通常は変更不要）', exact=True).click()
         page.locator('#expected-sha').fill('b'*40);expect_failure()
         page.locator('#expected-sha').fill('a'*40)
         damaged = temp/'damaged.age';damaged.write_bytes(cipher.read_bytes()[:-1])
@@ -88,10 +90,11 @@ def main() -> None:
         foreign = temp/'other.txt'
         subprocess.run(['age-keygen','-o',str(foreign)],capture_output=True,check=True)
         page.locator('#identity').set_input_files(foreign)
-        page.wait_for_function('(key) => document.getElementById("recipient").value !== key && document.getElementById("recipient").value.startsWith("age1")', arg=public_key)
+        foreign_public = subprocess.check_output(['age-keygen','-y',str(foreign)], text=True).strip()
+        expect(page.locator('#recipient')).to_have_value(foreign_public)
         page.locator('#cipher').set_input_files(cipher);expect_failure()
         page.locator('#identity').set_input_files(identity)
-        page.wait_for_function('(key) => document.getElementById("recipient").value === key', arg=public_key)
+        expect(page.locator('#recipient')).to_have_value(public_key)
         multiple = temp/'multiple.zip'
         with zipfile.ZipFile(multiple,'w') as archive:
             archive.writestr('report.json.age',cipher.read_bytes());archive.writestr('../extra.txt','x')
@@ -105,7 +108,7 @@ def main() -> None:
         review['summary_markdown'] = malicious
         encrypt(review)
         page.locator('#cipher').set_input_files(cipher)
-        page.locator('#open-report').click();page.wait_for_function("!document.getElementById('result').hidden")
+        page.locator('#open-report').click();expect(page.locator('#result')).to_be_visible()
         assert malicious in page.locator('#report-content').inner_text()
         assert page.locator('#report-content img').count() == 0
         assert page.evaluate('window.xss === undefined')
