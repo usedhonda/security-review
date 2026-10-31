@@ -1,20 +1,19 @@
 # Security policy
 
-This is an experimental review tool. It is not an approval authority or a
-replacement for human review, dependency scanning, secret scanning, or CodeQL.
+This is an experimental security-review utility, **not** an approval authority or a replacement for human security review, dependency scanning, secret scanning, or CodeQL.
 
-If you find a vulnerability in this tool, use the repository's private security
-advisory feature when it is available. Do not include API keys or unredacted
-findings from another project in a public issue. If private reporting is not
-enabled, open a minimal issue requesting a private reporting channel without
-exploit details or credentials.
+## Reporting vulnerabilities
 
-Supported version: the current default branch during this pilot. Review
-maintainer changes to workflows, prompts, manifest files and price tables before
-running a workflow with a secret. Public Actions summaries expose only
-allowlisted usage, cost, size, coverage and finding-count metrics. Detailed
-findings, model-written text and full reports are not uploaded as artifacts.
-Use the local CLI to inspect full reports, and review those reports before any
-publication. Repository history and existing Actions logs also become public
-when converting a private repository to public.
+Use GitHub's private vulnerability reporting / security advisory functionality when available. Do not post exploit details, secret values, or unredacted AI findings in public issues or pull requests. If private reporting is unavailable, open a minimal public issue requesting a secure contact channel, without sensitive details.
 
+## Maintainer and user responsibilities
+
+- Use a dedicated, least-privilege OpenAI API key stored as the `OPENAI_API_KEY` Actions secret. Do not commit it, put it in workflow inputs, or paste it into issue discussions.
+- Forks **do not inherit** the upstream Actions secrets. Fork users must add their own OpenAI key.
+- Do not treat the API key as cryptographically confined to GitHub or this repository. Control usage through the OpenAI project and spending settings as well.
+- Review changes to the default branch, workflows, prompts, source selection and pricing data **before** running the manual workflow. Collaborators with write access are in this trust boundary.
+- Public Actions summaries publish only allowlisted counts, sizes, token usage and cost. Findings text and full reports are not uploaded, but the metadata is publicly visible.
+- The configured application cost guard is per invocation, not an account-wide hard cap.
+- Static AI findings are hypotheses, not security guarantees. The source-selection manifest covers only explicitly chosen files.
+
+See [docs/SECURITY_AUDIT.md](docs/SECURITY_AUDIT.md) for verified properties, remaining risks and recommended validation. Supported version during the pilot: latest default branch.
