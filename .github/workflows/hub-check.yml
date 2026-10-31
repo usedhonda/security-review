@@ -1,0 +1,41 @@
+name: Result inbox readiness
+
+# Synthetic-only verification. No OpenAI calls or external repository writes.
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/hub-check.yml'
+      - 'scripts/hub_check.py'
+      - 'tests/test_hub_check.py'
+      - 'docs/RESULTS.md'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: result-inbox-readiness
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    if: github.event.repository.visibility == 'public' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - name: Checkout the trusted default-branch revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Test the synthetic delivery checker without credentials
+        run: python3 -m unittest discover -s tests -p test_hub_check.py -v
+      - name: Verify same-repository result storage with synthetic data
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: python3 scripts/hub_check.py
