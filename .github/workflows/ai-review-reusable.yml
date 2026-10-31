@@ -1,0 +1,47 @@
+name: Original AI security review
+
+on:
+  workflow_call:
+    inputs:
+      max_cost_usd:
+        type: string
+        default: '0.50'
+        description: Per-event estimated generation budget, maximum USD 1
+    secrets:
+      OPENAI_API_KEY:
+        required: false
+        description: The calling repository's own API key; never inherited from the engine repository
+
+permissions:
+  contents: read
+  pull-requests: read
+  security-events: write
+
+concurrency:
+  group: original-ai-review-${{ github.repository }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  review:
+    name: Review changed code with AI
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - name: Checkout the pinned review engine, never the PR's executable code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: usedhonda/security-review
+          ref: e84257da24ca62a93a25f5da6fab570459fae30d
+          path: review-engine
+          persist-credentials: false
+      - name: Verify event boundaries without credentials
+        working-directory: review-engine
+        run: python3 -m unittest discover -s tests -p test_review_event.py -q
+      - name: Review this PR or main change using the original AI engine
+        working-directory: review-engine
+        env:
+          PYTHONPATH: src
+          GITHUB_TOKEN: ${{ github.token }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          REVIEW_MAX_COST_USD: ${{ inputs.max_cost_usd }}
+        run: python3 scripts/review_event.py
