@@ -3,8 +3,15 @@
 .env.*
 *.pem
 *.key
+*.agekey
+identity.txt
 auth.json
 credentials.json
+
+# Reports and local encryption outputs (never commit decrypted findings)
+*.age
+security-review-bundle.json
+recovery-output/
 
 # Downloaded source, reports, local environments and builds
 .work/
@@ -16,4 +23,3 @@ __pycache__/
 build/
 dist/
 .DS_Store
-
