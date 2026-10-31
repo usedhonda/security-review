@@ -1,94 +1,49 @@
 #!/usr/bin/env python3
-"""Build a key-free HTTPS viewer from the verified offline helper.
-
-Only the generated viewer, robots.txt and .nojekyll enter the publishing folder.
-The original offline build is kept as a fixed, downloadable fallback.
-"""
+"""Build a small static launch page; no keys, report uploads or client-side crypto."""
 from __future__ import annotations
 import argparse
 import base64
 import hashlib
 import html
-import json
 import os
 from pathlib import Path
 import re
-import runpy
 
-ROOT = Path(__file__).resolve().parents[1]
-
-
-def replace_once(text: str, before: str, after: str) -> str:
-    if text.count(before) != 1:
-        raise ValueError('Viewer template changed; review the hosted transformation.')
-    return text.replace(before, after, 1)
+ROOT=Path(__file__).resolve().parents[1]
+STYLE='''body{margin:0;background:#f5f7fa;color:#172b3d;font:16px/1.8 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}main{max-width:820px;margin:auto;padding:55px 24px}h1{font-size:34px;line-height:1.4}h2{font-size:22px}.lead{font-size:19px}.actions{display:flex;gap:16px;flex-wrap:wrap;margin:30px 0}.button{display:inline-block;padding:16px 24px;border-radius:10px;background:#173d59;color:#fff;font-weight:700;text-decoration:none}.secondary{background:#fff;color:#173d59;border:1px solid #b7c9d7}section{background:#fff;border:1px solid #dce4ec;border-radius:12px;padding:24px;margin:20px 0}.note{color:#4d6273;font-size:14px}.label{font-size:13px;letter-spacing:.1em}.warning{border-left:4px solid #bb861e;padding:12px 18px;background:#fff7e5}a{color:#175d92}code{overflow-wrap:anywhere}footer{font-size:13px;margin-top:30px}@media(max-width:600px){h1{font-size:27px}.button{width:100%;text-align:center}main{padding:30px 18px}}'''
 
 
-def compile_hosted(offline: str, repository: str) -> str:
-    if not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9-]{0,38}/[A-Za-z0-9_.-]{1,100}', repository):
-        raise ValueError('Expected a GitHub owner/repository.')
-    owner, name = repository.split('/')
-    if name in ('.', '..'):
-        raise ValueError('Invalid repository name.')
-    origin = 'https://' + owner.lower() + '.github.io'
-    path = '/' + name + '/'
-    # Do not enable arbitrary websites or insecure HTTP. Preserve file: fallback.
-    allowed = '(location.protocol===\'file:\'||(location.origin===' + json.dumps(origin) + '&&' + json.dumps([path, path+'index.html']) + '.includes(location.pathname)))'
-    output = replace_once(offline, "location.protocol!=='file:'", '!' + allowed + '||window.top!==window')
-    output = replace_once(output,
-        'このHTMLを端末に保存し、Chromeでダブルクリックして開いてください。チャット内のプレビューやWebサイト上ではキーを読み込みません。',
-        '正規のHTTPSページ、または保存済みHTMLをChromeで直接開いてください。埋め込み画面や別のサイトではキーを読み込みません。')
-    output = replace_once(output, 'SECURITY REVIEW / LOCAL HELPER', 'SECURITY REVIEW / REPORT VIEWER')
-    output = replace_once(output,
-        'ターミナル・アプリのインストールは不要です。保存したこのHTMLをChromeで開いて使います。',
-        'このページをブックマークするだけ。HTMLの保存やアプリのインストールは不要です。')
-    output = replace_once(output,
-        '初回だけ、ボタンを押してキーのファイルを保存します。すでにキーがあれば、下でそのファイルを選んでください。',
-        '登録済みの方は、保存した読み取りキーを下で選び、そのまま③へ進んでください。キーの作り直し・GitHubへの再登録は不要です。初めての方だけキーを作成します。')
-    output = replace_once(output, 'value="usedhonda/security-review"', 'value="' + html.escape(repository, quote=True) + '"')
-    output = replace_once(output,
-        '秘密鍵・レポートを送信する機能、アクセス解析、外部スクリプト読込、ブラウザへの永続保存はありません。GitHubを開く操作だけは別タブへ移動します。GitHubとOpenAIはレビュー中に平文を処理します。この画面は信頼できる配布元から取得してください。',
-        'ページを開く際はGitHub Pagesへ通信しますが、選んだキー・ZIP・復号結果を送信する機能はありません。処理はブラウザ内だけで行い、外部スクリプト・アクセス解析・永続保存は使いません。GitHubリンクは別タブで開きます。サイトの配信コードとブラウザ拡張を信頼する必要があります。厳格な運用では、検証済みのオフライン版をご利用ください。GitHub runnerとOpenAIはレビュー中に平文を処理します。')
-    # Public run information only. Fragment values never go in an HTTP request.
-    initialization = '''  try {
-    const p=new URLSearchParams(location.hash.slice(1));
-    const run=p.get('run'), attempt=p.get('attempt')||'1', sha=p.get('sha')||'';
-    if(location.hash.length<=256 && [...p.keys()].every(k=>['run','attempt','sha'].includes(k)) && ['run','attempt','sha'].every(k=>p.getAll(k).length<=1) && /^[1-9][0-9]{0,19}$/.test(run||'') && /^[1-9][0-9]{0,9}$/.test(attempt) && (!sha||/^[a-f0-9]{40}$/.test(sha))) {
-      $('run-url').value='https://github.com/'+$('repository').value+'/actions/runs/'+run;
-      $('attempt').value=attempt;$('expected-sha').value=sha;
-    }
-  } catch { /* Invalid links leave the manual run fields empty. */ }
-  repoLinks();refresh();'''
-    output = replace_once(output, '  repoLinks();refresh();', initialization)
-    def digest(value: str) -> str:
-        return "'sha256-" + base64.b64encode(hashlib.sha256(value.encode()).digest()).decode() + "'"
-    scripts = re.findall(r'<script>(.*?)</script>', output, re.S)
-    styles = re.findall(r'<style>(.*?)</style>', output, re.S)
-    if len(scripts) != 2 or len(styles) != 1:
-        raise ValueError('Unexpected inline resources.')
-    csp = "default-src 'none'; connect-src 'none'; script-src " + ' '.join(map(digest, scripts))
-    csp += '; style-src ' + digest(styles[0]) + "; img-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; worker-src 'none'; media-src 'none'"
-    output, count = re.subn(r'(<meta http-equiv="Content-Security-Policy" content=")[^"]*(">)', lambda m: m[1]+csp+m[2], output)
-    if count != 1 or re.search(r'<(?:script|link)[^>]*(?:src|href)=', output, re.I):
-        raise ValueError('Unexpected resources or CSP.')
-    return output
+def build(repository):
+    if not re.fullmatch(r'[A-Za-z0-9-]+/[A-Za-z0-9_.-]+',repository) or repository.split('/')[1] in ('.','..'):
+        raise ValueError('Invalid repository')
+    repo=html.escape(repository,quote=True)
+    base='https://github.com/'+repo
+    style_hash=base64.b64encode(hashlib.sha256(STYLE.encode()).digest()).decode()
+    policy="default-src 'none'; script-src 'none'; connect-src 'none'; style-src 'sha256-"+style_hash+"'; img-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'"
+    return f'''<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="referrer" content="no-referrer"><meta http-equiv="Content-Security-Policy" content="{policy}"><title>Security Review — 開始と結果</title><style>{STYLE}</style></head><body><main>
+<div class="label">SECURITY REVIEW · 公開試験版</div><h1>自分の公開リポジトリを、<br>まとめてレビュー。</h1><p class="lead">リポジトリの選択は自動。結果はGitHubのSecurity画面に集約します。</p>
+<div class="actions"><a id="start" class="button" href="{base}/actions/workflows/account-review.yml">チェックを始める</a><a id="results" class="button secondary" href="{base}/security/code-scanning">結果を読む</a></div>
+<section><h2>登録済みなら、開始するだけ</h2><p>「チェックを始める」でGitHubを開き、<strong>Run workflow → 緑色のRun workflow</strong>を押します。鍵の作成、復号テスト、ZIPのダウンロード、リポジトリの選び直しは不要です。</p><p>終了後は「結果を読む」へ。GitHubにログインし、このリポジトリのセキュリティ結果を閲覧できる権限が必要です。</p><p class="note">実行先：<code>{repo}</code>。誰でもこの所有者のAPIを使える公開サービスではありません。</p></section>
+<section><h2>どこまでチェックする？</h2><p>所有者の公開リポジトリを毎回取得します。Fork・アーカイブ・中央ツール自身を除き、未確認のものを優先して<strong>1回最大3件</strong>を選びます。前回と同じコードの確認済み対象はスキップします。</p><p><strong>各件最大16ファイル・160 KBの選択レビュー</strong>です。アカウント内の全ファイルを一度で監査するものではありません。今回の対象と未実施分は実行結果に表示します。</p><p>AIは<code>gpt-6.1-sol</code>。1回合計の見積予算は<strong>1 USD以内</strong>、自動再試行はありません。新しいリポジトリも自動取得します。</p></section>
+<div class="warning"><strong>AIレビューは実 API での通し検証前です。</strong>初回は実行状態と費用を確認してください。失敗・未実施を「問題なし」とは扱いません。</div>
+<section><h2>初めて使う方だけ</h2><p>自分の中央リポジトリのActions Secretに<code>OPENAI_API_KEY</code>を登録します。すでに保存した方は作り直さず、利用できないと表示された場合だけ保存先・名前・適用範囲を確認します。</p><p>他の方は自分のForkで利用し、自分のAPI利用分を負担します。追加のGitHub PATや全リポジトリへの書き込み許可は使いません。</p><p class="note">このページはキーを入力・保存する画面ではありません。APIキーや秘密鍵を貼り付ける欄はありません。</p></section>
+<footer><a href="{base}">README・制限事項</a> · <a href="{base}/blob/main/docs/ACCOUNT_REVIEW.md">設計と運用</a><p>公開ページに詳細レポートは保存しません。GitHub runnerとOpenAIはレビュー中に平文を処理します。中央リポジトリの権限管理が結果の閲覧範囲になります。旧暗号化機能は任意の別経路として残ります。</p></footer>
+</main></body></html>'''
 
 
-def main() -> None:
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--repository', default=os.environ.get('GITHUB_REPOSITORY', 'usedhonda/security-review'))
-    args = parser.parse_args()
-    runpy.run_path(str(ROOT/'scripts/build_browser_helper.py'), run_name='__main__')
-    output = compile_hosted((ROOT/'dist/security-review.html').read_text(encoding='utf-8'), args.repository)
-    destination = ROOT/'_pages'
-    destination.mkdir(exist_ok=False)  # Refuse stale / additional files.
-    (destination/'index.html').write_text(output, encoding='utf-8')
-    (destination/'.nojekyll').write_text('')
+def main():
+    parser=argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--repository',default=os.environ.get('GITHUB_REPOSITORY','usedhonda/security-review'))
+    args=parser.parse_args()
+    # Keep the existing offline helper available to its separate test/build flow.
+    import runpy
+    runpy.run_path(str(ROOT/'scripts/build_browser_helper.py'),run_name='__main__')
+    destination=ROOT/'_pages';destination.mkdir(exist_ok=False)
+    (destination/'index.html').write_text(build(args.repository),encoding='utf-8')
     (destination/'robots.txt').write_text('User-agent: *\nDisallow: /\n')
-    if set(p.name for p in destination.iterdir()) != {'index.html', '.nojekyll', 'robots.txt'}:
-        raise ValueError('Unexpected publishing files.')
-    print('Built HTTPS viewer. No keys, reports or API credentials are included.')
+    (destination/'.nojekyll').write_text('')
+    assert {p.name for p in destination.iterdir()}=={'index.html','robots.txt','.nojekyll'}
+    print('Built the static launch page; no keys, reports or scripts included.')
 
 
-if __name__ == '__main__':
-    main()
+if __name__=='__main__':main()
