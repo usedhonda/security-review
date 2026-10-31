@@ -1,6 +1,6 @@
 name: Result inbox readiness
 
-# Synthetic-only verification. No OpenAI calls or external repository writes.
+# Synthetic inbox proof and read-only credential check. No inference or external repository writes.
 on:
   workflow_dispatch:
   push:
@@ -39,3 +39,69 @@ jobs:
           DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: python3 scripts/hub_check.py
+
+  api-connection:
+    # No checkout, dependency install, GitHub token, source code or generation request.
+    if: github.event.repository.visibility == 'public' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 2
+    permissions: {}
+    steps:
+      - name: Check the registered credential without inference
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          python3 - <<'PY'
+          import os
+          import re
+          import urllib.error
+          import urllib.request
+
+          class NoRedirect(urllib.request.HTTPRedirectHandler):
+              def redirect_request(self, *args, **kwargs):
+                  return None
+
+          def check(key, opener):
+              key = key.strip()
+              if not key:
+                  return 'missing'
+              if key.startswith('age1'):
+                  return 'report_public_key'
+              if 'AGE-SECRET-KEY-' in key:
+                  return 'report_private_key'
+              if not re.fullmatch(r'sk-[A-Za-z0-9_-]{16,2048}', key):
+                  return 'unexpected_format'
+              req = urllib.request.Request(
+                  'https://api.openai.com/v1/models', method='GET',
+                  headers={'Authorization': 'Bearer ' + key,
+                           'User-Agent': 'security-review-credential-check'})
+              try:
+                  with opener.open(req, timeout=20) as response:
+                      return 'accepted' if response.status == 200 else 'inconclusive'
+              except urllib.error.HTTPError as exc:
+                  code = exc.code
+                  exc.close()
+                  return {401: 'rejected', 403: 'permission_denied', 429: 'rate_limited'}.get(code, 'inconclusive')
+              except Exception:
+                  return 'inconclusive'
+
+          MESSAGES = {
+              'missing': 'OPENAI_API_KEY is unavailable to this job.',
+              'report_public_key': 'OPENAI_API_KEY contains a report encryption public key, not an OpenAI API key. It was not sent anywhere.',
+              'report_private_key': 'OPENAI_API_KEY contains a report reading private key, not an OpenAI API key. It was not sent anywhere.',
+              'unexpected_format': 'OPENAI_API_KEY has an unexpected format. No value was logged or sent.',
+              'accepted': 'OpenAI accepted this credential for GET /v1/models. Review-model access, billing balance and Responses permission are not yet verified.',
+              'rejected': 'OpenAI rejected the credential (HTTP 401). No inference was attempted.',
+              'permission_denied': 'The models check was denied (HTTP 403). This may be a restricted-key permission; validity is inconclusive.',
+              'rate_limited': 'The models check was rate limited (HTTP 429). Validity is inconclusive.',
+              'inconclusive': 'Connection check was inconclusive. No retry or inference was attempted.',
+          }
+
+          opener = urllib.request.build_opener(urllib.request.ProxyHandler({}), NoRedirect())
+          result = check(os.environ.get('OPENAI_API_KEY', ''), opener)
+          text = MESSAGES[result]
+          print('API connection: ' + result + '. ' + text)
+          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as stream:
+              stream.write('# API connection check\n\n' + text + '\n\nNo code, prompt, report, response body or credential value is published. No generation request was made.\n')
+          raise SystemExit(0 if result == 'accepted' else 1)
+          PY
