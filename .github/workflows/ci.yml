@@ -13,18 +13,24 @@ concurrency:
 
 jobs:
   test:
-    # Keep hosted-runner usage within the free public-repository configuration.
     if: github.event.repository.visibility == 'public'
     runs-on: ubuntu-24.04
-    timeout-minutes: 5
+    timeout-minutes: 10
     env:
       PYTHONPATH: src
       PYTHONUNBUFFERED: "1"
+      REQUIRE_AGE: "1"
     steps:
       - name: Check out the proposed code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+
+      - name: Install age for real encryption round-trip tests
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install --yes --no-install-recommends age
+          age --version
 
       - name: Verify the Python runtime
         run: python3 -c 'import sys; assert sys.version_info >= (3, 11), "Python 3.11+ is required"'
