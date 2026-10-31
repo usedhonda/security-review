@@ -13,6 +13,8 @@ concurrency:
 
 jobs:
   test:
+    # Keep hosted-runner usage within the free public-repository configuration.
+    if: github.event.repository.visibility == 'public'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     env:

@@ -28,6 +28,8 @@ concurrency:
 
 jobs:
   benchmark:
+    # Private repositories must use the local CLI, not paid hosted compute.
+    if: github.event.repository.visibility == 'public'
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     env:
@@ -89,58 +91,27 @@ jobs:
           BENCHMARK_MODEL: ${{ inputs.model }}
           BENCHMARK_BUDGET: ${{ inputs.max_cost_usd }}
         run: |
-          python3 -m security_review_lab run \
+          python3 -m security_review run \
             --manifest benchmarks/pilot.json \
             --output-dir reports/pilot \
             --model "$BENCHMARK_MODEL" \
             --max-cost-usd "$BENCHMARK_BUDGET" \
             --max-calls 3
 
-      - name: Preserve an incomplete status when no benchmark report exists
+      - name: Publish only public cost and coverage metrics
         if: always()
         env:
-          REVIEW_OUTCOME: ${{ steps.review.outcome }}
+          REVIEW_OUTCOME: ${{ steps.review.outcome || 'skipped' }}
         run: |
-          python3 - <<'PY'
-          import json
-          import os
-          from pathlib import Path
-
-          report_dir = Path("reports/pilot")
-          report_dir.mkdir(parents=True, exist_ok=True)
-          json_path = report_dir / "summary.json"
-          markdown_path = report_dir / "summary.md"
-          if not json_path.exists():
-              skipped = os.environ.get("REVIEW_OUTCOME", "skipped") in ("", "skipped")
-              payload = {
-                  "schema_version": 1,
-                  "status": "not_run" if skipped else "incomplete",
-                  "reason": "No benchmark report was produced; see the workflow step status.",
-                  "review_step_outcome": os.environ.get("REVIEW_OUTCOME", "skipped"),
-                  "actual_usage": None,
-                  "actual_cost_usd": None,
-                  "cost_status": "not_called" if skipped else "unknown",
-              }
-              json_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-          if not markdown_path.exists():
-              markdown_path.write_text(
-                  "# Pilot did not produce a complete report\n\n"
-                  "No security conclusion can be drawn from this run. See the workflow step status.\n\n"
-                  "Token usage and cost are unavailable; do not interpret missing values as zero.\n",
-                  encoding="utf-8",
-              )
-          with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as summary:
-              summary.write(markdown_path.read_text(encoding="utf-8"))
-          PY
-
-      - name: Save sanitized cost and result summaries
-        if: always()
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: security-review-pilot-${{ github.run_id }}-${{ github.run_attempt }}
-          path: |
-            reports/pilot/summary.json
-            reports/pilot/summary.md
-          if-no-files-found: error
-          retention-days: 7
-          include-hidden-files: false
+          if [[ -f src/security_review/public_metrics.py ]]; then
+            python3 -m security_review.public_metrics reports/pilot/summary.json \
+              --step-outcome "$REVIEW_OUTCOME" >> "$GITHUB_STEP_SUMMARY"
+          else
+            case "$REVIEW_OUTCOME" in
+              skipped) status=not_run ;;
+              *) status=incomplete ;;
+            esac
+            printf '%s\n' '# Security review metrics' '' "Status: **$status**" '' \
+              'Actual usage: null. Actual cost (USD): null. Findings count: null.' \
+              >> "$GITHUB_STEP_SUMMARY"
+          fi

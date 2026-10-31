@@ -109,7 +109,7 @@ class OpenAIClient:
         request = urllib.request.Request(
             API_ROOT + endpoint,
             data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
-            headers={"Authorization": "Bearer " + self._key, "Content-Type": "application/json", "User-Agent": "security-review-lab/0.1"},
+            headers={"Authorization": "Bearer " + self._key, "Content-Type": "application/json", "User-Agent": "security-review/0.1"},
             method="POST",
         )
         try:

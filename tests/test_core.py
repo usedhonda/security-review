@@ -13,12 +13,12 @@ import unittest
 from unittest.mock import patch
 import urllib.error
 
-from security_review_lab.api import OpenAIClient, build_request, count_request, parse_review, parse_usage
-from security_review_lab.budget import Budget, cost, parse_budget
-from security_review_lab.cli import run_experiment
-from security_review_lab.reports import markdown_text
-from security_review_lab.safety import Redactor, ReviewError
-from security_review_lab.sources import load_manifest, prepare_case
+from security_review.api import OpenAIClient, build_request, count_request, parse_review, parse_usage
+from security_review.budget import Budget, cost, parse_budget
+from security_review.cli import run_experiment
+from security_review.reports import markdown_text
+from security_review.safety import Redactor, ReviewError
+from security_review.sources import load_manifest, prepare_case
 
 
 def completed_response(*, findings=None, input_tokens=100, output_tokens=200, cached_tokens=0, reasoning_tokens=150):
@@ -159,7 +159,7 @@ class SourceSafetyTests(SourceFixture):
 
 class AccountingTests(SourceFixture):
     def test_plan_is_offline_even_when_key_is_missing(self):
-        with patch.dict(os.environ, {}, clear=True), patch("security_review_lab.cli.OpenAIClient", side_effect=AssertionError("must stay offline")):
+        with patch.dict(os.environ, {}, clear=True), patch("security_review.cli.OpenAIClient", side_effect=AssertionError("must stay offline")):
             report = run_experiment(self.manifest, self.root / "reports")
         self.assertEqual(report["status"], "planned")
         self.assertIsNone(report["cases"][0]["usage"])

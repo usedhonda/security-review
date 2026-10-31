@@ -233,7 +233,7 @@ def load_manifest(manifest_path: Path, project_root: Path) -> tuple[CaseSpec, ..
 
 def _http_read(opener: request.OpenerDirector, url: str, limit: int, *, metadata: bool = False) -> bytes:
     headers = {
-        "User-Agent": "security-review-lab/0.1",
+        "User-Agent": "security-review/0.1",
         "Accept": "application/vnd.github+json" if metadata else "text/plain",
         "Accept-Encoding": "identity",
     }

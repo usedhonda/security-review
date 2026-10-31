@@ -11,6 +11,10 @@ exploit details or credentials.
 
 Supported version: the current default branch during this pilot. Review
 maintainer changes to workflows, prompts, manifest files and price tables before
-running a workflow with a secret. Keep the pilot repository private until the
-tool and its generated findings have been reviewed for publication.
+running a workflow with a secret. Public Actions summaries expose only
+allowlisted usage, cost, size, coverage and finding-count metrics. Detailed
+findings, model-written text and full reports are not uploaded as artifacts.
+Use the local CLI to inspect full reports, and review those reports before any
+publication. Repository history and existing Actions logs also become public
+when converting a private repository to public.
 

@@ -1,22 +1,30 @@
-# security-review-lab
+# security-review
 
 Small, bounded experiments for AI security review of public GitHub code.
 
 GitHubアカウント全体へセキュリティレビューを導入する前に、**コード量・レビュー内容・API利用額を小さく実測する**ための試作です。Python 3.11以上の標準ライブラリだけで動きます。
 
-最初は非公開リポジトリで使用します。現段階は手動の検証用で、他のリポジトリへの自動導入やマージの制御は行いません。AIの指摘は人が確認する仮説です。結果が空でも、安全性の証明にはなりません。
+公開リポジトリの標準GitHub-hostedランナーを使い、Actionsの実行料金をかけずに計測できる構成です。現段階は手動の検証用で、他のリポジトリへの自動導入やマージの制御は行いません。AIの指摘は人が確認する仮説です。結果が空でも、安全性の証明にはなりません。
 
 ## 最初に行うこと
 
-1. このプロジェクトをGitHubの**非公開**リポジトリに配置します。
+1. このプロジェクトをGitHubの**公開**リポジトリに配置します。既存の非公開リポジトリを公開へ切り替える場合は、コミット履歴と過去のActionsログも公開対象になるため、内容を確認してから変更します。
 2. そのリポジトリで **Settings → Secrets and variables → Actions → New repository secret** を開きます。
 3. Nameに **`OPENAI_API_KEY`**、Secretに専用のOpenAI APIキーを登録します。キーをソースやチャットに記載する必要はありません。
 4. **Actions → Security review pilot → Run workflow** で、既定ブランチ、モデル `gpt-6.1-sol`、予算 `1.00` を選びます。
-5. 実行後のSummaryで使用量と指摘を確認します。詳細はArtifactの `summary.json` と `summary.md` に保存されます。
+5. 実行後のSummaryでコード量・カバー率・トークン使用量・利用額・指摘件数を確認します。指摘本文、ファイル別の箇所、モデルの自由記述は公開Summaryに出しません。Artifactのアップロードとキャッシュ保存は行いません。
 
 APIキーにはResponses APIの作成と入力トークン数の取得が必要です。GitHub側のキーはこの専用リポジトリのSecretに限定します。公開リポジトリのコード取得にはGitHubトークンを使いません。
 
 通常のpushとpull requestではオフラインのユニットテストだけが動き、OpenAI APIを呼びません。APIを使用するのは、メンテナーが明示的に開始した `Security review pilot` だけです。
+
+### ActionsとAPIの費用
+
+公開リポジトリで標準GitHub-hostedランナーを使うActions実行は無料です。このworkflowは標準の `ubuntu-24.04` を指定し、大型ランナー、Artifact保存、キャッシュ保存は使いません。両workflowはリポジトリが公開の場合だけジョブを実行します。非公開のまま試す場合はローカルCLIを使えます。非公開リポジトリのActions実行には一般にアカウント共有の月間無料枠と課金・予算制限が適用されます。公開された再利用workflowを非公開リポジトリから呼ぶ場合も、課金条件は呼び出し側のリポジトリに従います。
+
+OpenAI APIの利用額はActionsとは別に計測します。対象プランのChatGPT APIクレジットが有効で残高があれば、そのクレジットが適用されます。初期設定のアプリ側API予算は1回につき最大1 USDです。
+
+GitHub公式情報（2026-10-31確認）: [Billing and usage](https://docs.github.com/en/actions/concepts/billing-and-usage)。公開へ切り替えても、アカウント自体の実行制限などがあれば別途確認が必要です。
 
 ## 何を比較するか
 
@@ -86,7 +94,7 @@ GitHubへのネットワーク接続が必要です。取得先は `.work/source
 ### 3. APIを呼ばずに規模を確認
 
 ```sh
-PYTHONPATH=src python3 -m security_review_lab plan \
+PYTHONPATH=src python3 -m security_review plan \
   --manifest benchmarks/pilot.json \
   --output-dir reports/plan-001
 ```
@@ -95,10 +103,10 @@ PYTHONPATH=src python3 -m security_review_lab plan \
 
 ### 4. 実際にレビューする
 
-専用APIキーを環境変数 `OPENAI_API_KEY` に安全に設定した上で実行します。シェル履歴やコードにキーを書かないようにします。通常はGitHub ActionsのSecret利用が簡単です。
+専用APIキーを環境変数 `OPENAI_API_KEY` に安全に設定した上で実行します。シェル履歴やコードにキーを書かないようにします。指摘の詳細を読みたい場合は、このローカル実行の `summary.json` と `summary.md` を使用します。Actionsの公開Summaryは計測値だけを表示し、完全レポートはアップロードしません。
 
 ```sh
-PYTHONPATH=src python3 -m security_review_lab run \
+PYTHONPATH=src python3 -m security_review run \
   --manifest benchmarks/pilot.json \
   --output-dir reports/pilot-001 \
   --model gpt-6.1-sol \
@@ -121,7 +129,9 @@ PYTHONPATH=src python3 -m security_review_lab run \
 
 `completed` は処理と選択範囲のレビューが完了した状態であり、「脆弱性なし」ではありません。内容や請求情報が不完全なら `incomplete` / `failed` / `skipped_*` などを記録し、CLIは終了コード2を返します。`planned` はAPI未実行です。未計測の費用は `null` または `unknown` で記録し、ゼロと混同しません。
 
-生成前に予約額をレポートへ保存します。プロセスが強制終了された場合は `in_progress` のまま残ることがあります。GitHub自体の停止などではArtifact保存も完了しない場合があるため、保存失敗を費用ゼロと見なさないでください。
+上の表はローカルCLIが生成する完全レポートの項目です。Actionsの公開Summaryは、対象番号・モデル・状態と、コード量・カバー率・使用量・費用・指摘件数に限定します。対象番号はmanifestの並び順です。未知の値は `null` / `unknown` のまま表示します。
+
+生成前に予約額をレポートへ保存します。プロセスが強制終了された場合は `in_progress` のまま残ることがあります。GitHub自体の停止などではSummaryの保存も完了しない場合があるため、保存失敗を費用ゼロと見なさないでください。
 
 ## 安全性と信頼境界
 
@@ -129,9 +139,9 @@ PYTHONPATH=src python3 -m security_review_lab run \
 - プロンプト、manifest、ツール自身の変更は、実行前にメンテナーが確認する前提です。
 - ソース中の指示はデータとして扱います。モデルにはツールを渡さず、生成物も実行しません。プロンプトだけで誤判定を完全に防げるという意味ではありません。
 - 典型的なキー・トークン・秘密鍵を送信前とレポート生成時に秘匿化します。検知はbest effortです。現在の対象を公開ソースに限定しています。
-- Artifactにソースファイルや生のAPI応答を丸ごとコピーしません。モデルが書いた説明にはソース由来の内容が含まれる可能性があるため、公開前に人が確認します。
+- 公開Summaryは許可した計測項目だけから組み立てます。モデルの説明・指摘・制約や、任意のエラー説明を転記しません。完全レポートにはソース由来の内容が含まれる可能性があるため、ローカルでも公開前に人が確認します。
 - Actionsの権限は `contents: read` です。利用ActionはコミットSHA固定、checkoutは認証情報を残しません。
-- Artifactは2つの要約ファイルだけを7日間保存します。私的な検証結果は公開リポジトリにコミットしないでください。
+- ActionsからArtifactをアップロードせず、完全レポートは一時ランナー内だけに残ります。完全レポートや取得ソースはgit管理対象外です。指摘内容の検証にはローカルCLIを使います。
 
 `store: false` はResponses APIで応答を保存しない指定です。OpenAI側のすべてのログ保持がゼロになる保証ではありません。[API data controls](https://developers.openai.com/api/docs/guides/your-data) を確認してください。
 
@@ -139,7 +149,7 @@ PYTHONPATH=src python3 -m security_review_lab run \
 
 | パス | 役割 |
 | --- | --- |
-| `src/security_review_lab/` | CLI、入力制限、API通信、予算、レポート |
+| `src/security_review/` | CLI、入力制限、API通信、予算、レポート |
 | `scripts/fetch_cases.py` | 固定コミットの公開ファイル取得・ハッシュ検証 |
 | `benchmarks/pilot.json` | 比較する対象と範囲 |
 | `.github/workflows/ci.yml` | push / PRのオフライン検証 |
@@ -153,7 +163,7 @@ PYTHONPATH=src python3 -m security_review_lab run \
 2. Small / Medium / Largeの利用額と入力・出力トークンを比較します。初回の測定前に月額を断定しません。
 3. 差分レビューにする範囲、SolとAstraを使い分ける条件、月間上限を決めます。
 4. 結果が良ければ、再利用可能なworkflowとリポジトリごとの参加設定を追加します。Dependabot、Dependency Review、CodeQL、secret scanningと組み合わせます。
-5. 公開前に、説明・ライセンス・設定・例・取得元の扱い・結果の秘匿性を確認します。
+5. 他のプロジェクトへ展開する前に、説明・ライセンス・設定・例・取得元の扱い・結果の秘匿性を確認します。
 
 将来のdiff入力用に `base_commit` とhead側の `line_ranges` を受け付けますが、差分の自動抽出やPRイベントへの接続は未実装です。このpilotはsnapshotのみを使用します。
 

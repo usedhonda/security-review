@@ -195,13 +195,13 @@ def main(argv: list[str] | None = None) -> int:
     try:
         report = run_experiment(args.manifest, args.output_dir, live=args.command == "run", model=args.model, max_cost_usd=args.max_cost_usd, max_calls=args.max_calls, max_output_tokens=args.max_output_tokens)
     except ReviewError as error:
-        print("security-review-lab: " + str(error), file=sys.stderr)
+        print("security-review: " + str(error), file=sys.stderr)
         return 2
     except (OSError, KeyboardInterrupt):
-        print("security-review-lab: interrupted or local I/O failed; inspect the saved summary before retrying.", file=sys.stderr)
+        print("security-review: interrupted or local I/O failed; inspect the saved summary before retrying.", file=sys.stderr)
         return 2
     except Exception:
-        print("security-review-lab: unexpected error; inspect the saved summary before retrying.", file=sys.stderr)
+        print("security-review: unexpected error; inspect the saved summary before retrying.", file=sys.stderr)
         return 2
     print(f"{report['status']}: {report['budget']['generation_calls_attempted']} generation calls; usage-derived USD {report['budget']['usage_derived_cost_usd']}; reserved unresolved USD {report['budget']['unresolved_reserved_cost_usd']}.")
     print("Reports written: summary.json and summary.md.")
