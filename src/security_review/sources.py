@@ -7,10 +7,10 @@ import json
 import os
 from pathlib import Path, PurePosixPath
 import re
-import stat
 from typing import Any
 
 from .safety import Redactor, ReviewError, safe_integer
+from .guards import read_file
 
 MAX_MANIFEST_BYTES = 256_000
 MAX_FILE_BYTES = 2_000_000
@@ -23,7 +23,7 @@ def _safe_path(value: Any) -> str:
     if not isinstance(value, str) or not value or len(value) > 512:
         raise ReviewError("Invalid source path.")
     path = PurePosixPath(value)
-    if path.is_absolute() or "\\" in value or any(ord(char) < 32 for char in value):
+    if path.is_absolute() or "\\" in value or any(ord(char) < 32 or ord(char) == 127 for char in value):
         raise ReviewError("Unsafe source path.")
     if any(part in (".", "..", "") for part in value.split("/")):
         raise ReviewError("Unsafe source path.")
@@ -42,38 +42,18 @@ def _excluded(path: str) -> bool:
 
 
 def _read_source(root: Path, relative: str) -> bytes:
-    current = root
-    try:
-        for part in PurePosixPath(relative).parts:
-            current = current / part
-            if current.is_symlink():
-                raise ReviewError("Symlink source paths are not allowed.")
-        if not current.resolve().is_relative_to(root):
-            raise ReviewError("Source path escapes its root.")
-        fd = os.open(current, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_NONBLOCK", 0))
-        with os.fdopen(fd, "rb") as stream:
-            info = os.fstat(stream.fileno())
-            if not stat.S_ISREG(info.st_mode):
-                raise ReviewError("Source path is not a regular file.")
-            if info.st_size > MAX_FILE_BYTES:
-                raise ReviewError("A source file exceeds the 2 MB read limit.")
-            data = stream.read(MAX_FILE_BYTES + 1)
-        if len(data) > MAX_FILE_BYTES:
-            raise ReviewError("A source file exceeds the 2 MB read limit.")
-        return data
-    except OSError:
-        raise ReviewError("A source file could not be read.") from None
+    return read_file(root / _safe_path(relative), MAX_FILE_BYTES)
 
 
 def load_manifest(path: Path) -> list[dict[str, Any]]:
     try:
-        raw = path.read_bytes()
+        raw = read_file(path, MAX_MANIFEST_BYTES)
         if len(raw) > MAX_MANIFEST_BYTES:
             raise ReviewError("Manifest exceeds the 256 KB limit.")
-        document = json.loads(raw)
-    except (OSError, UnicodeError, json.JSONDecodeError):
+        document = json.loads(raw.decode("utf-8"))
+    except (OSError, UnicodeError, ValueError, RecursionError):
         raise ReviewError("Manifest must be a readable UTF-8 JSON document.") from None
-    if not isinstance(document, dict) or document.get("schema_version") != 1:
+    if not isinstance(document, dict) or type(document.get("schema_version")) is not int or document.get("schema_version") != 1:
         raise ReviewError("Manifest schema_version must be 1.")
     cases = document.get("cases")
     if not isinstance(cases, list) or not 1 <= len(cases) <= MAX_CASES:
@@ -131,7 +111,7 @@ def prepare_case(case: dict[str, Any], manifest_dir: Path, redactor: Redactor) -
     root = manifest_dir / case["source_root"]
     if root.is_symlink() or not root.is_dir():
         raise ReviewError("source_root must be a real directory.")
-    root = root.resolve()
+    root = Path(os.path.abspath(root))
     remaining = case.get("max_source_bytes", 48_000)
     files: list[dict[str, Any]] = []
     excerpts: list[dict[str, Any]] = []

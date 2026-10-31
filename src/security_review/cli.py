@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import argparse
 from datetime import datetime, timezone
-from decimal import Decimal
 from pathlib import Path
 import sys
 from typing import Any
@@ -14,6 +13,7 @@ from .budget import Budget, PRICES, cost, parse_budget, pricing, usd
 from .reports import initialize_output, sanitized_report, write_reports
 from .safety import Redactor, ReviewError, safe_integer
 from .sources import load_manifest, prepare_case
+from .guards import billing_matches, http_status
 
 
 def run_experiment(
@@ -78,6 +78,13 @@ def run_experiment(
     checkpoint()
     if not live:
         return sanitized_report(report, redactor)
+    # Never pay to review a selection we already know was truncated/excluded.
+    if any(not item["coverage"]["complete_for_selection"] for item in report["cases"]):
+        report["status"] = "incomplete"
+        for item in report["cases"]:
+            item.update(status="not_started", reason="incomplete_source_coverage" if not item["coverage"]["complete_for_selection"] else "another_case_has_incomplete_source_coverage")
+        checkpoint()
+        return sanitized_report(report, redactor)
     if client is None:
         try:
             client = OpenAIClient()
@@ -104,8 +111,8 @@ def run_experiment(
             input_tokens = client.count_tokens(request)
             safe_integer(input_tokens, "preflight input token count", 0, 10_000_000)
             result["preflight_input_tokens"] = input_tokens
-        except (ReviewError, KeyboardInterrupt):
-            result.update(status="preflight_failed", reason="official_token_count_unavailable; generation_not_sent")
+        except (Exception, KeyboardInterrupt) as error:
+            result.update(status="preflight_failed", reason="official_token_count_unavailable; generation_not_sent", error_http_status=http_status(error), error_phase="token_count")
             stop = True
             checkpoint()
             continue
@@ -124,23 +131,22 @@ def run_experiment(
             response = client.create_response(request)
             if not isinstance(response, dict):
                 raise ReviewError("Invalid response object.")
-            response_model = response.get("model")
-            model_matches = isinstance(response_model, str) and (response_model == model or response_model.startswith(model + "-"))
-            service_matches = response.get("service_tier", "default") in {"default", "standard"}
-            result["response_model"] = response_model if model_matches else None
-            result["service_tier"] = response.get("service_tier", "default") if service_matches else None
+            billing_known = billing_matches(response, model)
+            result["response_model"] = response.get("model") if billing_known else None
+            result["service_tier"] = response.get("service_tier") if billing_known else None
+            result["response_reasoning_mode"] = "standard" if billing_known else None
             usage = parse_usage(response)
             result["usage"] = usage
             measured = None
             cache_usage_known = usage is not None and all(usage[key] is not None for key in ("cached_input_tokens", "cache_write_tokens", "cache_write_tokens_30m", "cache_write_tokens_12h"))
-            if usage is not None and cache_usage_known and model_matches and service_matches:
+            if usage is not None and cache_usage_known and billing_known:
                 measured = cost(model, usage["input_tokens"], usage["output_tokens"], usage["cached_input_tokens"], usage["cache_write_tokens_30m"], usage["cache_write_tokens_12h"])
                 result["cost_usd"] = usd(measured)
                 result["cost_status"] = "calculated_from_api_usage"
             within_reservation = budget.settle(result["id"], measured)
             status, review, reason = parse_review(response, result["coverage"])
             result.update(status=status, review=redactor.object(review), reason=reason)
-            if usage is None or not cache_usage_known or not model_matches or not service_matches:
+            if usage is None or not cache_usage_known or not billing_known:
                 result.update(status="incomplete", reason="usage_or_billing_configuration_unknown", cost_status="reserved_usage_unknown")
                 stop = True
             elif not within_reservation or usage["input_tokens"] > input_tokens or usage["output_tokens"] > max_output_tokens:
@@ -161,7 +167,8 @@ def run_experiment(
                 elif not result["coverage"]["complete_for_selection"]:
                     result.update(status="incomplete", reason="incomplete_source_coverage")
                     stop = True
-        except (ReviewError, KeyboardInterrupt):
+        except (ReviewError, KeyboardInterrupt) as error:
+            result.update(error_http_status=http_status(error), error_phase="generation")
             # Do not refund an ambiguous request or retry it automatically.
             result.update(status="failed", reason="generation_failed; billing_unknown; no_retry", cost_status="reserved_usage_unknown")
             stop = True
@@ -204,5 +211,10 @@ def main(argv: list[str] | None = None) -> int:
         print("security-review: unexpected error; inspect the saved summary before retrying.", file=sys.stderr)
         return 2
     print(f"{report['status']}: {report['budget']['generation_calls_attempted']} generation calls; usage-derived USD {report['budget']['usage_derived_cost_usd']}; reserved unresolved USD {report['budget']['unresolved_reserved_cost_usd']}.")
+    for case in report["cases"]:
+        status = case.get("error_http_status")
+        phase = case.get("error_phase")
+        if type(status) is int and 100 <= status <= 599 and phase in {"token_count", "generation"}:
+            print(f"API diagnostic: phase={phase}, HTTP {status}; no response body logged and no retry made.")
     print("Reports written: summary.json and summary.md.")
     return 0 if report["status"] in {"planned", "completed"} else 2

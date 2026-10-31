@@ -23,7 +23,7 @@ from security_review.sources import load_manifest, prepare_case
 
 def completed_response(*, findings=None, input_tokens=100, output_tokens=200, cached_tokens=0, reasoning_tokens=150):
     review = {"summary": "Scope-limited static review.", "findings": findings or [], "limitations": ["No runtime verification."], "reviewed_files": ["app.py"]}
-    return {"model": "gpt-6.1-sol", "service_tier": "default", "status": "completed", "usage": {"input_tokens": input_tokens, "input_tokens_details": {"cached_tokens": cached_tokens, "cache_write_tokens": 0, "cache_write_tokens_details": {"ttl_30m_tokens": 0, "ttl_12h_tokens": 0}}, "output_tokens": output_tokens, "output_tokens_details": {"reasoning_tokens": reasoning_tokens}, "total_tokens": input_tokens + output_tokens}, "output": [{"type": "message", "status": "completed", "content": [{"type": "output_text", "text": json.dumps(review)}]}]}
+    return {"model": "gpt-6.1-sol", "service_tier": "default", "reasoning": {"mode": "standard"}, "status": "completed", "usage": {"input_tokens": input_tokens, "input_tokens_details": {"cached_tokens": cached_tokens, "cache_write_tokens": 0, "cache_write_tokens_details": {"ttl_30m_tokens": 0, "ttl_12h_tokens": 0}}, "output_tokens": output_tokens, "output_tokens_details": {"reasoning_tokens": reasoning_tokens}, "total_tokens": input_tokens + output_tokens}, "output": [{"type": "message", "status": "completed", "content": [{"type": "output_text", "text": json.dumps(review)}]}]}
 
 
 def finding(**overrides):
@@ -336,12 +336,13 @@ class OutputSafetyTests(SourceFixture):
         client = FakeClient()
         report = self.run_live(client)
         self.assertEqual(report["status"], "incomplete")
-        self.assertEqual(report["cases"][0]["status"], "incomplete")
+        self.assertEqual(report["cases"][0]["status"], "not_started")
         self.assertEqual(report["cases"][0]["reason"], "incomplete_source_coverage")
-        self.assertIsNotNone(report["cases"][0]["usage"])
-        self.assertIsNotNone(report["cases"][0]["cost_usd"])
-        self.assertEqual(report["cases"][1]["status"], "skipped_prior_error")
-        self.assertEqual(client.generate_calls, 1)
+        self.assertIsNone(report["cases"][0]["usage"])
+        self.assertIsNone(report["cases"][0]["cost_usd"])
+        self.assertEqual(report["cases"][1]["status"], "not_started")
+        self.assertEqual(client.generate_calls, 0)
+        self.assertEqual(client.count_calls, 0)
 
     def test_secret_echo_and_markdown_links_are_sanitized_in_artifacts(self):
         secret = "sk-proj-" + "Z9y8x7w6" * 5
