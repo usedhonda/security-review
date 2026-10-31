@@ -6,6 +6,9 @@
 
 ## はじめに — 迷ったらここから
 
+**料金と鍵の原則：ツールは公開・無料、実際のAIレビューを実行する利用者は各自のOpenAI APIキーでAPI料金を負担します。** Web画面の閲覧・レポートのローカル復号・APIを使わない回収テストにはOpenAI APIキーは不要です。Forkの有無ではなく、AIを実行するかどうかで区別します。上流の `usedhonda` のキーは他人への共用サービスではありません。
+
+
 **[Webアプリを開く](https://usedhonda.github.io/security-review/)** · **[回収テストを実行する](https://github.com/usedhonda/security-review/actions/workflows/benchmark.yml)** · **[実行履歴を見る](https://github.com/usedhonda/security-review/actions/workflows/benchmark.yml)**
 
 > このリポジトリは**公開試験版**です。対象は設定ファイルに記載した公開コードで、全体監査やPR自動レビューではありません。GitHub Actionsの標準公開ランナーは無料ですが、実際のOpenAI API呼び出しは別に費用が発生します。
@@ -16,7 +19,7 @@
 | **キー登録まで終わった方** | [Security review pilot](https://github.com/usedhonda/security-review/actions/workflows/benchmark.yml) の「Run workflow」から `recovery-check` を実行（API費用なし） |
 | **回収テストが終わった方** | GitHub実行画面から暗号化ZIPを保存 → [Webアプリ](https://usedhonda.github.io/security-review/)で保存済みの読み取りキーとZIPを選ぶ。実行ページURLは実行結果に記載のリンクから開けば自動入力可能 |
 | **本番相当のAIレビューを試す方** | 自分の `OPENAI_API_KEY` をActions Secretに登録して、回収確認後に `mode: review` を手動選択（1回の上限見積1 USD、最大3生成） |
-| **Forkした方** | 自分のリポジトリに `OPENAI_API_KEY` と `REVIEW_AGE_RECIPIENT` を設定。上流のSecretは継承されません。初期の対象3件は各自で変更します |
+| **自分でAIレビューを実行するすべての方** | Forkの有無にかかわらず、原則として自分のOpenAI APIキーと利用予算が必要です。自分のGitHubリポジトリに `OPENAI_API_KEY` を登録します。詳細結果を回収する場合は自分の復号鍵の公開部分を `REVIEW_AGE_RECIPIENT` に登録します。Forkには上流のSecretsは引き継がれません |
 
 **秘密鍵（読み取りキーファイル）はGitHub・Gist・チャットへアップロードしないでください。** Web画面へのアクセスには通信が発生しますが、鍵や復号済みの詳細はアプリから送信しない設計です。より厳密に配布コードを固定したい場合は[オフライン版](docs/BROWSER_HELPER.md)を使用してください。安全性と制約は[こちら](docs/HOSTED_VIEWER.md)を参照してください。
 
