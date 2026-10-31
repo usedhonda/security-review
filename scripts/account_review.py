@@ -135,10 +135,12 @@ def category(repo_id):
 def history(client, repo):
     result = {}
     for page in range(1, 11):
-        code, rows = client.call('/repos/' + repo + '/code-scanning/analyses?tool_name=' + parse.quote(TOOL) + '&per_page=100&page=' + str(page))
+        code, rows = client.call('/repos/' + repo + '/code-scanning/analyses?per_page=100&page=' + str(page))
         if code != 200 or not isinstance(rows, list):
-            raise CheckError('review_history_unavailable')
+            raise CheckError('review_history_unavailable_http_' + str(code))
         for row in rows:
+            if not isinstance(row, dict) or not isinstance(row.get('tool'), dict) or row['tool'].get('name') != TOOL:
+                continue
             name = row.get('category', '')
             version = row.get('tool', {}).get('version', '')
             if not row.get('error') and isinstance(name, str) and isinstance(version, str) and version.startswith(POLICY + '.') and digest(version[len(POLICY)+1:]):
@@ -161,6 +163,8 @@ def plan(public, owner, central, previous):
         meta = public.get('/repos/' + row['repository'])
         if not owned_public(meta, owner) or meta['id'] != row['id'] or meta.get('fork') or meta.get('archived') or meta.get('disabled'):
             row['status'] = 'excluded_changed_visibility_or_owner'; continue
+        if meta.get('size') == 0:
+            row['status'] = 'excluded_empty'; continue
         branch = meta.get('default_branch')
         if not isinstance(branch, str) or not branch or len(branch) > 256:
             row['status'] = 'excluded_empty'; continue
@@ -267,6 +271,7 @@ def main():
             write_json(MANIFEST,manifest);write_json(INVENTORY,inventory)
             with open(os.environ['GITHUB_OUTPUT'],'a') as stream:stream.write('has_cases='+str(bool(manifest['cases'])).lower()+'\n')
             print('Public repository inventory prepared; no AI request.')
+            print('Owned public repositories: ' + str(len(inventory['repositories'])) + '; selected this run: ' + str(len(manifest['cases'])) + '.')
         elif args.command=='publish':
             inventory=read_json(INVENTORY);report=read_json(WORK/'report'/'summary.json')
             if inventory.get('central_repository')!=repo or inventory.get('workflow_commit')!=sha or inventory.get('run_id')!=os.environ['GITHUB_RUN_ID']:
