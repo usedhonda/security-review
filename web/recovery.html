@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="__CSP__">
+<meta name="referrer" content="no-referrer">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Security Review — かんたん設定・レポートを開く</title>
+<style>
+:root{color-scheme:light;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans JP",sans-serif;color:#182938;background:#f3f6f9}*{box-sizing:border-box}body{margin:0}main{max-width:900px;margin:auto;padding:38px 22px 70px}header{margin-bottom:26px}.eyebrow{font-size:12px;letter-spacing:.12em;color:#49667c;font-weight:700}h1{font-size:29px;line-height:1.4;margin:10px 0}h2{font-size:21px;margin:0 0 10px}h3{font-size:17px;margin:0 0 8px}p{line-height:1.8;margin:8px 0}.muted,small{color:#50677b}small{display:block;line-height:1.7}.badge{display:inline-block;border:1px solid #b6cfbf;background:#eaf5ee;color:#225b36;padding:5px 10px;border-radius:7px;font-size:12px}.card{background:white;border:1px solid #dbe3eb;border-radius:14px;padding:24px;margin:18px 0}.step{display:flex;gap:14px;align-items:flex-start}.number{background:#203e55;color:white;border-radius:50%;width:30px;height:30px;display:grid;place-items:center;flex-shrink:0}.grow{flex:1;min-width:0}label{font-size:14px;font-weight:600;display:block;margin:14px 0 6px}input{font:inherit;width:100%;border:1px solid #b8c8d5;padding:11px;border-radius:7px;background:white;color:inherit}input[readonly]{font-size:13px;background:#f5f8fa}input[type=file]{font-size:14px}button,.link{font:inherit;font-size:14px;font-weight:600;border-radius:8px;border:1px solid #adc0cd;padding:11px 16px;background:white;color:#203e55;cursor:pointer;text-decoration:none;display:inline-block}button.primary{background:#203e55;color:white;border-color:#203e55}button:disabled{opacity:.45;cursor:not-allowed}button:hover:not(:disabled),.link:hover{filter:brightness(.95)}.row{display:flex;flex-wrap:wrap;gap:9px;margin:13px 0;align-items:center}.warning{background:#fff7e5;border-left:3px solid #bc821a;padding:12px 16px;font-size:14px;border-radius:3px}.status{white-space:pre-wrap;line-height:1.7;font-size:14px;padding:12px 0}.status.error{color:#a12b23}.status.good{color:#226844}[hidden]{display:none!important}details{margin-top:15px}summary{cursor:pointer;color:#365e79;font-size:14px}pre{white-space:pre-wrap;overflow-wrap:anywhere;font:13px/1.7 ui-monospace,SFMono-Regular,Consolas,monospace;background:#f5f7f9;padding:16px;border-radius:8px}article{border-top:1px solid #dbe3eb;padding:18px 0}.finding{border:1px solid #dce5eb;border-left:4px solid #6e8b9e;border-radius:8px;padding:16px;margin:12px 0;overflow-wrap:anywhere}.finding p{font-size:14px}.finding strong{display:block;margin-top:10px;font-size:12px;color:#486277}.result-meta{font-size:13px;overflow-wrap:anywhere}.counter{font-size:13px;color:#49667c}.footer{margin-top:30px;font-size:12px;color:#627688}a:focus-visible,button:focus-visible,input:focus-visible{outline:3px solid #548dbb;outline-offset:3px}@media(max-width:600px){main{padding:22px 14px}h1{font-size:24px}.card{padding:18px}.step{gap:10px}.row button,.row .link{flex:1;text-align:center}}
+</style>
+</head>
+<body><main>
+<header><div class="eyebrow">SECURITY REVIEW / LOCAL HELPER</div><h1>最初の設定も、レポートを読むのも。<br>この画面だけで。</h1><p class="muted">ターミナル・アプリのインストールは不要です。保存したこのHTMLをChromeで開いて使います。</p><span class="badge">キーとレポートの処理は、この端末内だけ</span></header>
+<div id="fatal" class="warning" hidden></div>
+<div id="app">
+<section class="card"><div class="step"><span class="number">1</span><div class="grow"><h2>読み取り用のキーを保存</h2><p>初回だけ、ボタンを押してキーのファイルを保存します。すでにキーがあれば、下でそのファイルを選んでください。</p>
+<div class="row"><button id="generate" class="primary">読み取りキーを作って保存</button><button id="save-key" disabled>同じキーをもう一度保存</button></div>
+<small>保存先は通常「ダウンロード」です。キーを失うと、過去のレポートは読めなくなります。他人に渡したり、GitHubやチャットへアップロードしたりしないでください。</small>
+<label for="identity">保存した読み取りキーを選ぶ（以前のidentity.txtも使用できます）</label><input id="identity" type="file" accept=".txt,.key">
+<div id="key-status" class="status" role="status" aria-live="polite">キーはまだ読み込まれていません。</div></div></div></section>
+<section class="card"><div class="step"><span class="number">2</span><div class="grow"><h2>GitHubへ一度だけ登録</h2><p>ここで渡すのは<strong>公開の登録コード</strong>だけです。読み取りキーそのものや、OpenAIのAPIキーではありません。</p>
+<label for="repository">登録先のリポジトリ</label><input id="repository" value="usedhonda/security-review" spellcheck="false" autocomplete="off">
+<div class="row"><a id="settings" class="link" target="_blank" rel="noopener noreferrer">GitHubの登録画面を開く</a></div>
+<label for="secret-name">Name欄に入れる文字列</label><input id="secret-name" readonly value="REVIEW_AGE_RECIPIENT"><div class="row"><button id="copy-name">Nameをコピー</button></div>
+<label for="recipient">Secret欄に入れる登録コード</label><input id="recipient" readonly placeholder="先に上の手順でキーを用意してください"><div class="row"><button id="copy-recipient" disabled>登録コードをコピー</button></div>
+<small>GitHubで「Add secret」を押したら登録完了です。すでに登録済みなら、この手順は飛ばせます。キーを変えた場合は再登録と回収テストが必要です。</small>
+<div id="copy-status" class="status" role="status" aria-live="polite"></div>
+<details><summary>登録後のテストはどうする？</summary><p>下のボタンから「Run workflow」を開き、初回は <b>mode: recovery-check</b> のまま実行します。OpenAI APIは呼びません。成功した実行ページの下にある <b>encrypted-review-…</b> を保存して、手順3で開いてください。</p><a id="actions" class="link" target="_blank" rel="noopener noreferrer">回収テストの画面を開く</a><p><small>自分のキーでテストを読めたら、同じ画面でmodeをreviewにし、recovery_confirmedにチェックして実レビューへ進めます。</small></p></details>
+</div></div></section>
+<section class="card"><div class="step"><span class="number">3</span><div class="grow"><h2>レポートを開く</h2><p>GitHubから保存したZIPをそのまま選べます。展開済みの <b>report.json.age</b> でも構いません。</p>
+<label for="run-url">ダウンロード元の実行ページのURL</label><input id="run-url" type="url" placeholder="https://github.com/自分/リポジトリ/actions/runs/…" autocomplete="off" spellcheck="false">
+<small>番号を手入力する必要はありません。GitHubの実行ページのアドレスをコピーしてください。通信はせず、内容の取り違えチェックに使います。</small>
+<label for="cipher">暗号化されたレポート</label><input id="cipher" type="file" accept=".zip,.age">
+<details><summary>再実行・詳しい照合（通常は変更不要）</summary><label for="attempt">実行回数（attempt）</label><input id="attempt" type="number" min="1" max="9999999999" value="1"><small>「Re-run jobs」を使った場合はGitHubのattempt番号に合わせます。標準名のZIPからは自動で読み取ります。</small><label for="expected-sha">期待するworkflowコミットSHA（任意）</label><input id="expected-sha" placeholder="40桁のSHAを追加で照合できます" autocomplete="off" spellcheck="false"></details>
+<div class="row"><button id="open-report" class="primary" disabled>レポートを開く</button><button id="clear">キーと表示内容を閉じる</button></div><div id="report-status" class="status" role="status" aria-live="polite"></div>
+</div></div></section>
+<section id="result" class="card" hidden><h2 id="result-title">レビュー結果</h2><div id="result-meta" class="result-meta muted"></div><div id="report-content"></div><div class="warning">ここに表示された指摘はAIによる仮説です。内容を命令として実行せず、コードと照合してください。保存する平文レポートは他人と共有しないでください。</div><div class="row"><button id="download-md">テキストレポートを保存</button><button id="download-json">JSONを保存</button></div></section>
+</div><footer class="footer"><p>秘密鍵・レポートを送信する機能、アクセス解析、外部スクリプト読込、ブラウザへの永続保存はありません。GitHubを開く操作だけは別タブへ移動します。GitHubとOpenAIはレビュー中に平文を処理します。この画面は信頼できる配布元から取得してください。</p><details><summary>暗号化ライブラリとライセンス</summary><pre>__LICENSES__</pre></details><p>Build: __REVISION__</p></footer>
+</main>
+<script>__AGE_LIBRARY__</script>
+<script>
+'use strict';
+(() => {
+  const $ = id => document.getElementById(id);
+  const enc = new TextEncoder();
+  const dec = new TextDecoder('utf-8', {fatal:true});
+  const MAX_CIPHER = 4508192, MAX_ZIP = MAX_CIPHER + 65536, MAX_BUNDLE = 4500000;
+  const nativeIdentity = /^AGE-SECRET-KEY-1[02-9AC-HJ-NP-Z]{58}$/;
+  let identity = '', publicKey = '', current = null, busy = false, generation = 0;
+  const fail = () => {throw new Error('invalid');};
+  function status(id, text, good=false) { $(id).textContent=text; $(id).className='status'+(good?' good':''); }
+  function error(id, text) {status(id,text);$(id).classList.add('error');}
+  function download(name, text) {
+    const url=URL.createObjectURL(new Blob([text],{type:'text/plain;charset=utf-8'}));
+    const a=document.createElement('a'); a.href=url; a.download=name; a.click();
+    setTimeout(()=>URL.revokeObjectURL(url),1000);
+  }
+  function resetReport() {current=null;$('result').hidden=true;$('report-content').replaceChildren();$('result-meta').textContent='';status('report-status','');}
+  function refresh() {$('identity').disabled=busy;$('generate').disabled=!!identity||busy;$('save-key').disabled=!identity||busy;$('copy-recipient').disabled=!publicKey||busy;$('open-report').disabled=!identity||!$('cipher').files.length||busy;}
+  function keyFile() {return '# Security Review: PRIVATE reading key. Do not upload or share.\n# public key: '+publicKey+'\n'+identity+'\n';}
+  function saveKey() {download('security-review-key-'+publicKey.slice(-8)+'.txt',keyFile());}
+  function repoLinks() {
+    const repo=$('repository').value.trim();
+    for(const id of ['settings','actions'])$(id).removeAttribute('href');
+    if(!/^[A-Za-z0-9][A-Za-z0-9-]{0,38}\/[A-Za-z0-9_.-]{1,100}$/.test(repo)||['.','..'].includes(repo.split('/')[1]))return;
+    $('settings').href='https://github.com/'+repo+'/settings/secrets/actions/new';
+    $('actions').href='https://github.com/'+repo+'/actions/workflows/benchmark.yml';
+  }
+  async function adopt(value, ticket) {
+    const lines=value.trim().split(/\r?\n/).map(s=>s.trim()).filter(s=>s&&!s.startsWith('#'));
+    if(lines.length!==1||!nativeIdentity.test(lines[0]))fail();
+    const recipient=await age.identityToRecipient(lines[0]);
+    if(!/^age1[qpzry9x8gf2tvdw0s3jn54khce6mua7l]{58}$/.test(recipient))fail();
+    if(ticket!==generation)return false;
+    identity=lines[0];publicKey=recipient;$('recipient').value=publicKey;resetReport();
+    status('key-status','読み取りキーを準備しました。キー本体はGitHubへ渡しません。',true);refresh();return true;
+  }
+  function parseRun(value) {
+    const u=new URL(value.trim());
+    if(u.origin!=='https://github.com'||u.username||u.password)fail();
+    const m=/^\/([A-Za-z0-9-]+\/[A-Za-z0-9_.-]+)\/actions\/runs\/([1-9][0-9]{0,19})(?:\/attempts\/([1-9][0-9]{0,9}))?\/?$/.exec(u.pathname);
+    if(!m)fail();return {repository:m[1],run_id:m[2],run_attempt:m[3]||String($('attempt').value)};
+  }
+  function crc32(bytes){let crc=0xffffffff;for(const b of bytes){crc^=b;for(let i=0;i<8;i++)crc=(crc>>>1)^((crc&1)?0xedb88320:0);}return(crc^0xffffffff)>>>0;}
+  async function extractAge(data) {
+    const magic=enc.encode('age-encryption.org/v1\n');
+    if(magic.every((b,i)=>data[i]===b)){if(data.length>MAX_CIPHER)fail();return data;}
+    // Strict single-entry ZIP reader. Never extract names to the filesystem.
+    if(data.length<22||data.length>MAX_ZIP)fail();
+    const v=new DataView(data.buffer,data.byteOffset,data.byteLength);let e=-1;
+    for(let i=data.length-22;i>=Math.max(0,data.length-65557);i--)if(v.getUint32(i,true)===0x06054b50&&i+22+v.getUint16(i+20,true)===data.length){e=i;break;}
+    if(e<0||v.getUint16(e+4,true)||v.getUint16(e+6,true)||v.getUint16(e+8,true)!==1||v.getUint16(e+10,true)!==1)fail();
+    const n=v.getUint32(e+12,true),c=v.getUint32(e+16,true);
+    if(n<46||c+n!==e||v.getUint32(c,true)!==0x02014b50)fail();
+    const flags=v.getUint16(c+8,true),method=v.getUint16(c+10,true),crc=v.getUint32(c+16,true),size=v.getUint32(c+20,true),plain=v.getUint32(c+24,true),nl=v.getUint16(c+28,true),xl=v.getUint16(c+30,true),cl=v.getUint16(c+32,true),local=v.getUint32(c+42,true);
+    if(flags&~0x0808||![0,8].includes(method)||!plain||plain>MAX_CIPHER||size>MAX_CIPHER||46+nl+xl+cl!==n||v.getUint16(c+34,true))fail();
+    const name=dec.decode(data.subarray(c+46,c+46+nl));if(name!=='report.json.age')fail();
+    if(local+30>c||v.getUint32(local,true)!==0x04034b50||v.getUint16(local+6,true)!==flags||v.getUint16(local+8,true)!==method)fail();
+    const lnl=v.getUint16(local+26,true),lxl=v.getUint16(local+28,true),start=local+30+lnl+lxl;
+    if(start>c||start+size>c||dec.decode(data.subarray(local+30,local+30+lnl))!==name)fail();
+    let out=data.subarray(start,start+size);
+    if(method===8){
+      const reader=new Blob([out]).stream().pipeThrough(new DecompressionStream('deflate-raw')).getReader();
+      const chunks=[];let total=0;
+      try{for(;;){const part=await reader.read();if(part.done)break;total+=part.value.length;if(total>plain||total>MAX_CIPHER)fail();chunks.push(part.value);}}
+      finally{await reader.cancel().catch(()=>{});}
+      out=new Uint8Array(total);let at=0;for(const chunk of chunks){out.set(chunk,at);at+=chunk.length;}
+    }
+    if(out.length!==plain||crc32(out)!==crc||!magic.every((b,i)=>out[i]===b))fail();return out;
+  }
+  async function validateBundle(text,expected,recipient) {
+    if(enc.encode(text).length>MAX_BUNDLE)fail();const b=JSON.parse(text);
+    if(!b||typeof b!=='object'||Array.isArray(b)||Object.keys(b).sort().join(',')!=='format,provenance,summary_json,summary_markdown'||b.format!=='security-review.age-bundle.v1')fail();
+    const p=b.provenance;if(!p||typeof p!=='object'||Array.isArray(p))fail();
+    for(const k of ['repository','run_id','run_attempt'])if(p[k]!==expected[k])fail();
+    if(!/^[a-f0-9]{40}$/.test(p.workflow_commit)||!['probe','review'].includes(p.kind)||!['success','failure','cancelled','skipped','unknown'].includes(p.step_outcome))fail();
+    const requested=$('expected-sha').value.trim();if(requested&&(!/^[a-f0-9]{40}$/.test(requested)||p.workflow_commit!==requested))fail();
+    const fingerprint=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',enc.encode(recipient))),x=>x.toString(16).padStart(2,'0')).join('');
+    if(p.recipient_sha256!==fingerprint)fail();
+    for(const key of ['summary_json','summary_markdown'])if(typeof b[key]!=='string'||enc.encode(b[key]).length>2000000)fail();
+    const r=JSON.parse(b.summary_json);if(!r||typeof r!=='object'||Array.isArray(r)||r.schema_version!==1)fail();
+    if(p.kind==='probe'&&(r.status!=='recovery_probe'||r.api_calls!==0))fail();
+    if(p.kind==='review'&&(!Array.isArray(r.cases)||r.cases.length>12))fail();
+    return {bundle:b,report:r};
+  }
+  const paragraph=(parent,text,tag='p')=>{const node=document.createElement(tag);node.textContent=typeof text==='string'?text:String(text??'');parent.append(node);return node;};
+  function renderResult(value) {
+    const {bundle:b,report:r}=value,p=b.provenance,root=$('report-content');root.replaceChildren();
+    $('result-title').textContent=p.kind==='probe'?'回収テストに成功しました':'セキュリティレビュー結果';
+    $('result-meta').textContent=p.repository+' / 実行 '+p.run_id+' / attempt '+p.run_attempt+'\nworkflow: '+p.workflow_commit;
+    if(p.kind==='probe')paragraph(root,'このキーでレポートを読めることを確認できました。OpenAI APIは呼んでいません。次はGitHubでmodeをreviewにし、recovery_confirmedにチェックできます。');
+    else {
+      paragraph(root,'処理状態: '+String(r.status??'unknown')+'。完了という表示は「脆弱性なし」の意味ではありません。');
+      for(const c of r.cases){
+        if(!c||typeof c!=='object')continue;const section=document.createElement('article');root.append(section);
+        paragraph(section,c.repository||c.id||'対象','h3');paragraph(section,'状態: '+String(c.status??'unknown')+' / API利用額: '+String(c.cost_usd??'未確定')+' USD');
+        const review=c.review;if(!review||typeof review!=='object'){paragraph(section,'この対象の詳細なレビュー結果はありません。');continue;}
+        paragraph(section,review.summary||'');
+        const findings=Array.isArray(review.findings)?review.findings:[];
+        if(findings.length>40)fail();
+        if(!findings.length)paragraph(section,'選択した範囲では指摘が記録されていません。安全性の保証ではありません。');
+        for(const f of findings){if(!f||typeof f!=='object')continue;const box=document.createElement('div');box.className='finding';section.append(box);paragraph(box,f.title||'指摘','h3');paragraph(box,'重大度: '+String(f.severity??'unknown')+' / '+String(f.file??'')+':'+String(f.start_line??'')+'–'+String(f.end_line??''));for(const[k,label]of[['entry_point','入口'],['input_flow','入力の流れ'],['evidence','根拠'],['impact','影響'],['fix','修正案']]){paragraph(box,label,'strong');paragraph(box,f[k]||'');}}
+        if(Array.isArray(review.limitations))for(const item of review.limitations.slice(0,256))paragraph(section,'制約: '+String(item));
+      }
+    }
+    $('result').hidden=false;
+  }
+  async function copy(id){try{await navigator.clipboard.writeText($(id).value);status('copy-status','コピーしました。GitHubの該当欄へ貼り付けてください。',true);}catch{$(id).focus();$(id).select();status('copy-status','文字列を選択しました。⌘C（WindowsはCtrl+C）でコピーしてください。');}}
+  $('generate').addEventListener('click',async()=>{busy=true;refresh();const ticket=++generation;try{if(!await adopt(await age.generateIdentity(),ticket))return;saveKey();status('key-status','キーの保存を開始しました。保存されたファイルを大切に保管してください。次に手順2の登録コードを使います。',true);}catch{error('key-status','キーを作成できませんでした。ダウンロードしたHTMLを最新のChromeで開いてください。');}finally{busy=false;refresh();}});
+  $('save-key').addEventListener('click',saveKey);
+  $('identity').addEventListener('change',async()=>{const file=$('identity').files[0];if(!file)return;const ticket=++generation;identity='';publicKey='';$('recipient').value='';resetReport();refresh();try{if(file.size>16384)fail();const text=await file.text();if(ticket!==generation)return;await adopt(text,ticket);}catch{error('key-status','読み取りキーのファイルを確認してください。APIキーや登録コードではなく、保存したsecurity-review-key-….txtを選びます。');}refresh();});
+  $('repository').addEventListener('input',repoLinks);$('copy-name').addEventListener('click',()=>copy('secret-name'));$('copy-recipient').addEventListener('click',()=>copy('recipient'));
+  $('run-url').addEventListener('input',()=>{resetReport();try{const u=new URL($('run-url').value);const m=/\/attempts\/([1-9][0-9]*)\/?$/.exec(u.pathname);if(m)$('attempt').value=m[1];}catch{}});
+  $('attempt').addEventListener('input',resetReport);$('expected-sha').addEventListener('input',resetReport);
+  $('cipher').addEventListener('change',()=>{resetReport();const m=/^encrypted-review-([1-9][0-9]*)-([1-9][0-9]*)\.zip$/.exec($('cipher').files[0]?.name||'');if(m)$('attempt').value=m[2];refresh();});
+  $('open-report').addEventListener('click',async()=>{resetReport();busy=true;refresh();const ticket=generation;try{const expected=parseRun($('run-url').value);if(!/^[1-9][0-9]{0,9}$/.test(expected.run_attempt))fail();const file=$('cipher').files[0];if(!identity||!file||file.size>MAX_ZIP)fail();status('report-status','この端末内でレポートを開いています。');const bytes=await extractAge(new Uint8Array(await file.arrayBuffer()));const d=new age.Decrypter();d.addIdentity(identity);const text=await d.decrypt(bytes,'text');const result=await validateBundle(text,expected,publicKey);if(ticket!==generation)return;renderResult(result);current=result;status('report-status','復号と、実行ページ・キーの照合に成功しました。',true);}catch{resetReport();error('report-status','開けませんでした。読み取りキー・実行ページのURL・再実行回数・ファイルを確認してください。ZIPに対応しないブラウザではZIPを展開し、report.json.ageを選んでください。内容は表示していません。');}finally{busy=false;refresh();}});
+  function clear(){generation++;identity='';publicKey='';current=null;$('identity').value='';$('cipher').value='';$('recipient').value='';resetReport();status('key-status','キーとレポートを閉じました。再度読むときは保存したキーを選んでください。');refresh();}
+  $('clear').addEventListener('click',clear);window.addEventListener('pagehide',clear);
+  $('download-md').addEventListener('click',()=>{if(current)download('security-review-'+current.bundle.provenance.run_id+'.md',current.bundle.summary_markdown);});
+  $('download-json').addEventListener('click',()=>{if(current)download('security-review-'+current.bundle.provenance.run_id+'.json',current.bundle.summary_json);});
+  repoLinks();refresh();
+  if(location.protocol!=='file:'||!crypto?.subtle||typeof age==='undefined'){$('app').hidden=true;$('fatal').hidden=false;$('fatal').textContent='このHTMLを端末に保存し、Chromeでダブルクリックして開いてください。チャット内のプレビューやWebサイト上ではキーを読み込みません。';}
+})();
+</script>
+</body></html>
