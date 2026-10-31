@@ -5,13 +5,12 @@ from __future__ import annotations
 from copy import deepcopy
 from html import escape
 import json
-import os
 from pathlib import Path
 import re
-import tempfile
 from typing import Any
 
-from .safety import Redactor, ReviewError
+from .safety import Redactor
+from .guards import claim_output, write_report
 
 
 def markdown_text(value: Any) -> str:
@@ -61,31 +60,11 @@ def render_markdown(report: dict[str, Any]) -> str:
 
 
 def initialize_output(directory: Path) -> None:
-    if directory.is_symlink():
-        raise ReviewError("Output directory cannot be a symlink.")
-    try:
-        directory.mkdir(parents=True, exist_ok=True)
-        if any((directory / filename).exists() for filename in ("summary.json", "summary.md")):
-            raise ReviewError("Output already exists; use a fresh directory to avoid accidental reruns.")
-    except OSError:
-        raise ReviewError("Output directory could not be created.") from None
+    claim_output(directory)
 
 
 def _atomic_write(path: Path, content: str) -> None:
-    temp_path = None
-    try:
-        fd, name = tempfile.mkstemp(prefix=".report-", dir=path.parent)
-        temp_path = Path(name)
-        with os.fdopen(fd, "w", encoding="utf-8") as stream:
-            stream.write(content)
-            stream.flush()
-            os.fsync(stream.fileno())
-        os.replace(temp_path, path)
-    except OSError:
-        raise ReviewError("Report could not be written.") from None
-    finally:
-        if temp_path is not None:
-            temp_path.unlink(missing_ok=True)
+    write_report(path, content)
 
 
 def sanitized_report(report: dict[str, Any], redactor: Redactor) -> dict[str, Any]:

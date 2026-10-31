@@ -1,6 +1,6 @@
 name: Security review pilot
 
-# Paid API calls only run when a repository maintainer starts this workflow.
+# Billable calls remain manual; push/PR only run the separate offline checks.
 on:
   workflow_dispatch:
     inputs:
@@ -21,17 +21,15 @@ on:
 permissions:
   contents: read
 
-# Keep the shared budget ledger in one process and allow each run to finish.
 concurrency:
   group: security-review-pilot
   cancel-in-progress: false
 
 jobs:
   benchmark:
-    # Private repositories must use the local CLI, not paid hosted compute.
     if: github.event.repository.visibility == 'public'
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 20
     env:
       PYTHONPATH: src
       PYTHONUNBUFFERED: "1"
@@ -51,24 +49,9 @@ jobs:
           ref: ${{ github.sha }}
           persist-credentials: false
 
-      - name: Verify the Python runtime and spending limit
-        env:
-          BENCHMARK_BUDGET: ${{ inputs.max_cost_usd }}
-        run: |
-          python3 - <<'PY'
-          import os
-          import sys
-          from decimal import Decimal, InvalidOperation
-
-          if sys.version_info < (3, 11):
-              raise SystemExit("Python 3.11+ is required")
-          try:
-              budget = Decimal(os.environ["BENCHMARK_BUDGET"])
-          except InvalidOperation:
-              raise SystemExit("The spending limit must be a number")
-          if not budget.is_finite() or not Decimal("0") < budget <= Decimal("1.00"):
-              raise SystemExit("The spending limit must be greater than 0 and at most 1.00 USD")
-          PY
+      # Test this exact revision before exposing the API secret to any step.
+      - name: Run offline safety and accounting tests
+        run: python3 -m unittest discover -s tests -v
 
       - name: Verify the API secret is configured
         env:
@@ -83,9 +66,11 @@ jobs:
         timeout-minutes: 2
         run: python3 scripts/fetch_cases.py --manifest benchmarks/pilot.json
 
+      # The CLI validates the model, budget and complete source selection before
+      # any API request. Up to 6 requests (3 counts + 3 generations), no retries.
       - name: Review the pilot samples
         id: review
-        timeout-minutes: 6
+        timeout-minutes: 15
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           BENCHMARK_MODEL: ${{ inputs.model }}
@@ -107,11 +92,7 @@ jobs:
             python3 -m security_review.public_metrics reports/pilot/summary.json \
               --step-outcome "$REVIEW_OUTCOME" >> "$GITHUB_STEP_SUMMARY"
           else
-            case "$REVIEW_OUTCOME" in
-              skipped) status=not_run ;;
-              *) status=incomplete ;;
-            esac
-            printf '%s\n' '# Security review metrics' '' "Status: **$status**" '' \
-              'Actual usage: null. Actual cost (USD): null. Findings count: null.' \
+            printf '%s\n' '# Security review metrics' '' 'Status: **incomplete**' '' \
+              'Usage and cost are unknown; no security conclusion can be drawn.' \
               >> "$GITHUB_STEP_SUMMARY"
           fi
