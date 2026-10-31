@@ -1,94 +1,77 @@
 # security-review
 
-Bounded AI security-review experiments with encrypted report recovery.
+**公開GitHubコードをAIでレビューし、コード量・指摘の品質・API費用を小さく実測するツールです。**
 
-公開GitHubコードを対象に、**コード量・指摘の品質・API利用額を小さく検証する**ための実験的なツールです。まだPR自動レビュー製品ではありません。指摘は人が検証する仮説であり、結果が空でも安全性の証明にはなりません。
+公開試験版です。自動PRレビュー製品や安全性の保証ではありません。対象はmanifestに明記した公開ファイルだけで、リポジトリ全体の監査ではありません。
 
-## 最初はAPIなしで、安全に回収できることを確認
+## まずは画面で設定する
 
-1. このリポジトリを自分のアカウントにForkし、Actionsを有効にします。標準hosted-runner用workflowは公開リポジトリでのみ実行します。
-2. 信頼できる自分のMac/Linux端末でageを導入し、`bash scripts/setup_report_key.sh` を実行します。秘密鍵は端末に保存し、表示された**公開鍵だけ**を自分のリポジトリのActions Secret `REVIEW_AGE_RECIPIENT` に登録します。
-3. Actions → **Security review pilot** → Run workflowを、既定の **`recovery-check`** で実行します。これはOpenAI APIを呼ばず、APIキーも不要です。
-4. 実行ページから暗号文Artifactを取得して、自分の端末で復号します。詳しいコマンドと失敗時の扱いは **[暗号化回収ガイド](docs/ENCRYPTED_RECOVERY.md)** にあります。
-5. 復号確認後、自分のOpenAI APIキーをActions Secret `OPENAI_API_KEY` に登録し、`mode: review` と `recovery_confirmed: true` を選びます。初期モデル・予算は `gpt-6.1-sol`、1回最大1 USDの見積予算です。
+ターミナルは不要です。設定と暗号化レポートの表示を **`security-review.html`** にまとめています。
 
-**自分のAPIキー＋自分の回収用公開鍵**を使う構成です。上流のキーを共有するサービスではありません。秘密鍵 `identity.txt` はGitHub、チャット、workflow inputに渡しません。公開鍵もSecretsへ登録するのは、入力ミス時のログ露出を抑えるためです。
+1. このリポジトリのActionsで **Offline browser helper → mainの成功した実行 → offline-browser-helper** を保存・展開し、`security-review.html` をChromeで開きます。
+2. **読み取りキーを作って保存**を押します。キーは自分の端末で作られ、端末にだけ保存します。
+3. 同じ画面の案内で、GitHubへ**公開の登録コードだけ**を `REVIEW_AGE_RECIPIENT` として登録します。
 
-## 結果はどこに残るか
+すでにキーがあれば、保存したキーのファイルを選べます。キー本体をGitHubやチャットへアップロードしないでください。Fork利用者は自分のキーを用意し、登録先を自分の `OWNER/REPO` に変えます。
 
-| 情報 | 保存先 |
-| --- | --- |
-| コード量・トークン使用量・利用額・指摘件数 | 公開Actions Summary |
-| 詳しい指摘・根拠・修正案 | **ageで暗号化したArtifact**。7日保持 |
-| 復号したMarkdown/JSON | 利用者の端末だけ |
-| 復号用秘密鍵 | 利用者の端末と安全なバックアップだけ |
+[画面操作の説明](docs/BROWSER_HELPER.md) / [暗号化の設計・従来のCLI手順](docs/ENCRYPTED_RECOVERY.md)
 
-公開Artifactは非公開ストレージではありません。第三者が暗号文を取得する可能性を前提にします。暗号化失敗時に平文で代替することはなく、raw API応答や取得ソースもuploadしません。暗号文のサイズや公開Summaryの数値は見えます。
+## 回収テスト → 実レビュー
 
-API失敗後も、残っている最新JSON checkpointの暗号化を試みます。ただしrunner消失・強制停止・upload失敗時まで回収を保証しません。レポート未取得を課金ゼロや脆弱性ゼロとは扱いません。
+**Security review pilot** は手動実行だけです。
 
-## 比較する対象
+最初は既定の **recovery-check** でテスト用レポートを作ります。OpenAI APIは呼ばず、APIキーも不要です。実行ページのArtifact `encrypted-review-…` を保存し、HTMLで読み取りキー、ZIP、実行ページURLを指定して開いてください。番号や長いコマンドの入力は不要です。
 
-`benchmarks/pilot.json` は、コミットSHAとファイルを明示した3つの公開サンプルです。**リポジトリ全体の監査ではありません。** Forkして別の対象をレビューする場合は、自分が送信してよい公開コードをmanifestに設定します。
+自分のキーで「回収テストに成功しました」と表示されたら、同じworkflowで **mode: review / recovery_confirmed: true** を選びます。専用のOpenAI APIキーを自分のリポジトリのActions Secret `OPENAI_API_KEY` に登録しておく必要があります。上流リポジトリのAPIキー・SecretsはForkへ引き継がれません。
 
-| 対象 | 選択ファイル | ソース量 |
+**公開されるのは費用等の計測値と暗号文です。詳細な指摘は、ローカルHTMLまたはCLIで復号して読みます。** 生の指摘本文・取得ソース・秘密鍵を公開Artifactに置きません。
+
+## 実測の対象と費用
+
+初期manifest `benchmarks/pilot.json` は固定コミットから選択した次の3組です。
+
+| 対象 | 選択ファイル数 | 選択ソース量 |
 | --- | ---: | ---: |
-| `usedhonda/statusline` | 3 | 6,190 bytes |
-| `usedhonda/muse-agent-bridge` | 7 | 51,074 bytes |
-| `usedhonda/openclaw-artist-runtime` | 8 | 137,577 bytes |
+| usedhonda/statusline | 3 | 6,190 bytes |
+| usedhonda/muse-agent-bridge | 7 | 51,074 bytes |
+| usedhonda/openclaw-artist-runtime | 8 | 137,577 bytes |
 
-固定コミットの公開ソースを取得し、Git blob/SHA-256を確認します。取得コードの実行や依存ライブラリのインストールは行いません。欠けた選択範囲はAPIを呼ぶ前に拒否します。manifestは信頼できる設定としてレビューしてください。任意の第三者manifestを安全に実行するsandboxではありません。
+モデルは `gpt-6.1-sol`、手動で `gpt-6-astra` も選択可能です。**1回の実行につき見積予算1 USD以下、最大3生成、自動再試行なし**です。生成前に公式入力トークン数と最大出力料金で予約します。価格は記録済みの公表単価に基づく見積もりで、請求書やクレジット残高ではありません。
 
-## 費用と制限
+公開リポジトリの標準 `ubuntu-24.04` runnerを使用します。Actions実行とOpenAI APIは別の費用です。利用可能なAPIクレジットの有効化・残高・適用範囲は本人のOpenAIアカウントで確認してください。Artifactの保持・保存枠にもGitHubの条件が適用されます。無制限の無料保存やAPI無料利用を保証するツールではありません。
 
-公開リポジトリの標準 `ubuntu-24.04` runnerを使用します。新しい有料保存サービスは追加しません。暗号文Artifactは最大約4.51 MB/実行、保持7日で、GitHubアカウントの保存枠・制限に従います。**無制限の無料保存や、OpenAI APIが常に無料になることは保証しません。**
+アプリの上限は**1回単位**で、月間・アカウント全体の予算ではありません。失敗やタイムアウトで使用量が不明なら未解決の予約額を残し、後続を止めます。不明をゼロや安全と扱わず、盲目的に再実行しないでください。
 
-| 項目 | 設定 |
-| --- | --- |
-| API予算 | **1回につき最大1.00 USDの見積予算**。月額/アカウント全体の上限ではありません |
-| 生成 | 最大3回、自動再試行なし |
-| 出力 | 1生成あたり最大6,000 tokens（推論を含む） |
-| 入力 | 最大128,000 tokens、生成前の公式token count必須 |
-| API失敗/課金情報不明 | 予約額を維持して後続を停止。ゼロ円とは扱わない |
-| 実行条件 | 既定ブランチ・手動のみ。回収確認の明示が必要 |
-| モデルのツール/応答保存 | ツールなし、`store: false` |
+## 現状と安全性
 
-料金表は日付付きの公表単価です。API応答のモデル・サービス区分・推論モード・usageを確認し、費用を計算します。公表単価からの利用額であり、請求額やクレジット残高の実測ではありません。サービス側の予算設定・クレジット適用は利用者が別途確認してください。`store: false` もAPI提供元のすべてのログ保持をゼロにする保証ではありません。
+通常のpush/PRではAPIを呼ばずテストだけを行います。対象コードを実行せず、固定コミット・ハッシュを検証してテキストとして送ります。選択範囲の欠落、読み取り先の不正、課金条件不明などでは処理を止めます。プロンプトインジェクションや秘匿化対策はbest effortです。
 
-## ローカル実行
+暗号化はage。秘密鍵は端末に残し、公開Artifactには固定名の暗号文だけを保存します。配信失敗やrunner消失時の回収までは保証しません。暗号化は、レビュー中に平文を処理するGitHub runner/OpenAIや、コードを書き換えられる管理者からの保護ではありません。ブランチ保護・権限管理も必要です。
 
-コアはPython 3.11+の標準ライブラリのみです。暗号化回収には別途age CLIが必要です。CIはageをインストールし、実際の暗号化/復号テストを必須にします。
+**テスト成功は、本人の実鍵でのGitHub回収や実APIレビュー成功を意味しません。** まず自分の鍵で回収を確認し、その後に実際の品質・費用を評価してください。PR自動実行・PRコメント・再利用workflow・月次予算管理はまだ未実装です。
+
+[セキュリティ方針](SECURITY.md) / [実装修正の記録](docs/SECURITY_AUDIT.md)
+
+## 開発者向けCLI
+
+Python 3.11以上。基本部分は標準ライブラリ、暗号化回収にはage CLIを使用します。
 
 ```sh
-# APIなしのテスト
 PYTHONPATH=src python3 -m unittest discover -s tests -v
-
-# 固定した公開ソースの取得（GitHubへの通信あり）
 python3 scripts/fetch_cases.py --manifest benchmarks/pilot.json
-
-# APIなしの規模見積もり
-PYTHONPATH=src python3 -m security_review plan \
-  --manifest benchmarks/pilot.json --output-dir reports/plan-001
-
-# APIキーを環境変数へ安全に設定した後の実レビュー
-PYTHONPATH=src python3 -m security_review run \
-  --manifest benchmarks/pilot.json --output-dir reports/pilot-001 \
-  --model gpt-6.1-sol --max-cost-usd 1.00 --max-calls 3
+PYTHONPATH=src python3 -m security_review plan --manifest benchmarks/pilot.json --output-dir reports/plan-001
 ```
 
-ローカルCLIの完全レポートは `summary.json` / `summary.md` です。出力先の再利用は拒否します。`planned` はAPI未実行、`completed` は選択範囲の処理完了であって「安全」の意味ではありません。未知のusage/費用は `null` / `unknown` です。
+`plan` はAPIなしの規模見積もりです。実レビューは、専用キーを環境変数に安全に設定した上で `plan` を `run` に変更し、`--model gpt-6.1-sol --max-cost-usd 1.00 --max-calls 3` を指定します。APIキーをコードやシェル履歴へ書かないでください。既存出力の再利用は拒否します。
 
-## 信頼境界と開発状況
-
-暗号化は公開閲覧者から保存済み指摘を守るためのものです。**GitHub runnerとOpenAIはレビュー中に平文を処理します。** workflowを書き換えられるメンテナーの悪意や、秘密鍵の漏洩を解決するものではありません。ブランチ保護・変更レビュー・最小権限は別に必要です。ageは送信者の署名でもないため、暗号文は自分の信頼する実行から取得してください。
-
-通常のpush/PRはAPIなしのテストのみです。PRへの自動推論・コメント、再利用workflow、月間予算の統合管理は未実装です。回収テスト、実APIの品質/費用比較を終えてから広げます。CI成功だけで実鍵での回収・実APIの互換性・検出品質を検証済みとは扱いません。
-
-- [暗号化回収と鍵の管理](docs/ENCRYPTED_RECOVERY.md)
-- [セキュリティ方針](SECURITY.md)
-- [PR #1時点の実装監査と残課題](docs/SECURITY_AUDIT.md)（その後の回収方式は暗号化回収ガイドを参照）
-- [GitHub Actions billing](https://docs.github.com/en/billing/concepts/product-billing/github-actions)
+| パス | 内容 |
+| --- | --- |
+| src/security_review/ | 入力検証・API・予算・レポート・暗号化回収 |
+| web/recovery.html | ローカル画面のビルド前ソース |
+| scripts/build_browser_helper.py | SHA固定のageライブラリを内蔵するHTMLビルド |
+| benchmarks/pilot.json | 固定コミット・ファイル選択 |
+| tests/ | オフライン・暗号化・ブラウザ検証 |
 
 ## License
 
-MIT。サンプルの対象コードは各リポジトリのライセンスに従います。対象コードや利用者の鍵は同梱しません。
+MIT。対象コードは各リポジトリのライセンスに従い、ソースを同梱しません。ブラウザ用Typageと依存ライブラリのライセンスは配布HTMLに同梱します。
