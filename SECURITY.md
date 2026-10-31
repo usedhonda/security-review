@@ -1,27 +1,31 @@
 # Security policy
 
-This is an experimental utility, not a security certification or a replacement for human review, dependency scanning, secret scanning or CodeQL.
+This is an experimental utility, not a security certification or replacement for CodeQL, dependency/secret scanning or human review.
 
-## Report vulnerabilities privately
+## Standard account workflow
 
-Use GitHub private vulnerability reporting when available. Do not publish exploit details, credentials or unredacted findings in public issues/PRs. If private reporting is unavailable, request a confidential contact channel without including sensitive details.
+`Review my public repositories` discovers the central repository owner's public repositories. Its ephemeral Actions token can read contents and write code-scanning results in the central repository only. It does not need a user PAT or write access to target repositories. The OpenAI key is supplied only to the manual key-check and inference steps of this workflow. Automatic pushes run an API-free inventory/storage check, not paid inference.
 
-## Keys and trust boundaries
+The separate `Result inbox readiness` workflow checks the presence (not value or validity) of the existing OpenAI Secret and tests synthetic SARIF delivery. It can run on trusted default-branch pushes but never calls OpenAI. Pull-request unit/browser tests do not receive the OpenAI key.
 
-- Each installation uses its own `OPENAI_API_KEY` repository secret and its own age public recipient in `REVIEW_AGE_RECIPIENT`. Forks must configure both. No upstream API or decryption key is distributed.
-- Keep the age **private** identity only on a trusted local machine and secure backup. Never store it in GitHub Secrets, workflow inputs, repository files, artifacts or chat. The public recipient is stored as a Secret as a log-redaction precaution against input mistakes.
-- An OpenAI key is not cryptographically confined to a repository. Use a dedicated project and provider-side spending controls; rotate on suspected exposure. The application's $1 estimate cap is per invocation, not a monthly guarantee.
-- Workflow/default-branch write access is trusted. A malicious maintainer can exfiltrate plaintext before encryption or change the recipient. Branch protection, environment restrictions and review remain separate controls.
-- Both the GitHub runner and OpenAI process plaintext during a review. This feature protects stored report contents from public artifact readers, not from those processors.
+Detailed completed findings are sent to the central repository's Security/Code scanning inbox. Model text, source bodies and SARIF are not logged, uploaded as artifacts or posted as PR comments. The primary location is an aggregation anchor; the actual target repository, commit and source location are in each finding. Users with the applicable security permissions can read results. This is not owner-only access.
 
-## Encrypted recovery policy
+GitHub runner/OpenAI process plaintext. Workflow maintainers, repository write access, browser/account security and GitHub's access-control implementation remain trust boundaries. Branch protection has not been enabled by this change. Synthetic public-access tests are scoped checks, not exhaustive verification of all UI/notification paths. Delivery failure or runner loss can lose a report even after an API request has been billed. Never blindly re-run ambiguous attempts.
 
-Detailed reports may be uploaded **only encrypted with age** to the configured native X25519 public recipient. Public summaries remain allowlisted numeric metrics and fixed statuses. Upload exactly `report.json.age`, never a directory, plaintext, identity, raw API response or downloaded source. Encryption failure has no plaintext fallback. Retention is seven days, not a guarantee of deletion of third-party copies.
+## Keys and budgets
 
-The default manual mode is an API-free recovery probe. Paid review requires an explicit acknowledgement that the current key's probe was decrypted locally. This is an accidental-spend guard, not cryptographic proof of possession. Invalid/missing keys fail before API access.
+- Use a dedicated OpenAI project key in the central repository Secret `OPENAI_API_KEY`. Never put it in code, inputs, issues or chat.
+- Forks do not inherit upstream Secrets. Each actual AI-review operator supplies their own API key and pays their own API usage. The upstream account is not a shared inference service.
+- A leaked API key is not cryptographically restricted to GitHub. Use provider-side project spending controls and rotate on suspected exposure.
+- The local USD 1 estimate and three-generation cap apply per invocation, not per account/month. Unresolved usage is not zero cost.
+- Target code is text data only; it is not imported/executed and receives neither the GitHub writer token nor execution tools. Redaction and prompt-injection defenses remain best-effort.
 
-Recovery holds decrypted output in memory until age succeeds, then checks repository/run/attempt/workflow revision and writes fixed filenames privately. It does not execute report content. age encryption is not a sender signature: download only from the intended trusted GitHub run. Compromised keys can expose previously captured ciphertext; key rotation protects future runs only.
+## Legacy encrypted reports
 
-A failed model request may still leave a recoverable checkpoint. Runner loss, cancellation or upload failure can still lose a report. Do not equate missing delivery with zero billing or no vulnerabilities; do not retry paid calls blindly. Local cleanup is not guaranteed secure erasure.
+The former age-key/ZIP recovery path is optional and remains for existing reports. Existing reading keys are not deleted or reused as API keys. The offline helper remains available; the standard hosted page is now a static start/result launcher with no key inputs, scripts or report decryption.
 
-See [encrypted recovery](docs/ENCRYPTED_RECOVERY.md) and the [implementation review](docs/SECURITY_AUDIT.md). CI's disposable-key tests do not establish that a user's real key is configured, a real download succeeded, or a live model review is accurate. Supported version: current default branch during the pilot.
+## Disclosure
+
+Use private vulnerability reporting/security advisories when available. Do not put exploit details, tokens or unredacted findings in public issues. If private reporting is unavailable, request a private contact channel in a minimal issue without sensitive details.
+
+See [account workflow boundaries](docs/ACCOUNT_REVIEW.md) and the historical [implementation audit](docs/SECURITY_AUDIT.md). Supported version during the pilot: current default branch.

@@ -1,99 +1,59 @@
 # security-review
 
-**公開GitHubコードをAIでレビューし、コード量・指摘の品質・API費用を小さく実測するツールです。**
+**自分の公開リポジトリを自動で見つけ、AIレビューの結果をGitHubのSecurity画面で読むツールです。公開試験版です。**
 
-公開試験版です。自動PRレビュー製品や安全性の保証ではありません。対象はmanifestに明記した公開ファイルだけで、リポジトリ全体の監査ではありません。
+## 使う場所は2つだけ
 
-## はじめに — 迷ったらここから
+### [チェックを始める](https://github.com/usedhonda/security-review/actions/workflows/account-review.yml)
 
-**料金と鍵の原則：ツールは公開・無料、実際のAIレビューを実行する利用者は各自のOpenAI APIキーでAPI料金を負担します。** Web画面の閲覧・レポートのローカル復号・APIを使わない回収テストにはOpenAI APIキーは不要です。Forkの有無ではなく、AIを実行するかどうかで区別します。上流の `usedhonda` のキーは他人への共用サービスではありません。
+GitHubの **Run workflow → 緑色のRun workflow** を押します。対象は自動選択です。通常の操作に、読み取りキーの生成・回収テスト・ZIPのダウンロード・GitHub PATの発行はありません。
 
+### [結果を読む](https://github.com/usedhonda/security-review/security/code-scanning)
 
-**[Webアプリを開く](https://usedhonda.github.io/security-review/)** · **[回収テストを実行する](https://github.com/usedhonda/security-review/actions/workflows/benchmark.yml)** · **[実行履歴を見る](https://github.com/usedhonda/security-review/actions/workflows/benchmark.yml)**
+終了後、**中央の `security-review` の Security → Code scanning** で読みます。対象リポジトリ側ではなく、この中央リポジトリに集約します。GitHubへのログインと、このリポジトリのセキュリティ結果を見る権限が必要です。
 
-> このリポジトリは**公開試験版**です。対象は設定ファイルに記載した公開コードで、全体監査やPR自動レビューではありません。GitHub Actionsの標準公開ランナーは無料ですが、実際のOpenAI API呼び出しは別に費用が発生します。
+[ブックマーク用の入口](https://usedhonda.github.io/security-review/)
 
-| 利用状況 | 最初にすること |
-| --- | --- |
-| **はじめての方** | [Webアプリ](https://usedhonda.github.io/security-review/)で「読み取りキーを作って保存」→ 表示される公開の登録コードをGitHub Actions Secret `REVIEW_AGE_RECIPIENT` に一度登録 |
-| **キー登録まで終わった方** | [Security review pilot](https://github.com/usedhonda/security-review/actions/workflows/benchmark.yml) の「Run workflow」から `recovery-check` を実行（API費用なし） |
-| **回収テストが終わった方** | GitHub実行画面から暗号化ZIPを保存 → [Webアプリ](https://usedhonda.github.io/security-review/)で保存済みの読み取りキーとZIPを選ぶ。実行ページURLは実行結果に記載のリンクから開けば自動入力可能 |
-| **本番相当のAIレビューを試す方** | 自分の `OPENAI_API_KEY` をActions Secretに登録して、回収確認後に `mode: review` を手動選択（1回の上限見積1 USD、最大3生成） |
-| **自分でAIレビューを実行するすべての方** | Forkの有無にかかわらず、原則として自分のOpenAI APIキーと利用予算が必要です。自分のGitHubリポジトリに `OPENAI_API_KEY` を登録します。詳細結果を回収する場合は自分の復号鍵の公開部分を `REVIEW_AGE_RECIPIENT` に登録します。Forkには上流のSecretsは引き継がれません |
+## すでに設定した方
 
-**秘密鍵（読み取りキーファイル）はGitHub・Gist・チャットへアップロードしないでください。** Web画面へのアクセスには通信が発生しますが、鍵や復号済みの詳細はアプリから送信しない設計です。より厳密に配布コードを固定したい場合は[オフライン版](docs/BROWSER_HELPER.md)を使用してください。安全性と制約は[こちら](docs/HOSTED_VIEWER.md)を参照してください。
+既存の `OPENAI_API_KEY` を使用します。APIキー・読み取りキーの作り直しは不要です。ただし、実行時にAPIキーが利用できないと表示された場合は、保存先・名前・適用範囲の確認が必要です。暗号化用のキー・Secretは残りますが、新しい標準手順では使用しません。
 
-## まずはURLで開く
+**2026-10-31の確認：** 中央の結果保存・認証付き読み出し・匿名APIアクセス拒否の実テストは成功しました。一方、そのActionsには `OPENAI_API_KEY` が空で渡されており、実APIレビューの完走はまだ確認できていません。「既にAIレビューまで動いた」という意味ではありません。
 
-**[レポート画面](https://usedhonda.github.io/security-review/)** をブックマークして使います。HTMLを毎回保存する必要はありません。初回の公開には **Settings → Pages → Source → GitHub Actions** の設定と、**Report viewer website** のdeploy成功が必要です。まだ開けない場合は[公開手順](docs/HOSTED_VIEWER.md)を確認してください。Forkでは自分の `https://OWNER.github.io/REPOSITORY/` を使用します。
+## 初めて使う方
 
-**すでに登録済みの方：保存した読み取りキーとレポートのZIPを選ぶだけです。キーの作り直し・GitHubへの再登録は不要です。** 実行情報入りリンクから開けば実行ページURLも自動入力されます。通常のリンクから開いた場合は、GitHubの実行ページURLを貼ってください。
+この中央ツールを自分の公開リポジトリへFork/配置し、**自分の**OpenAI APIキーを `OPENAI_API_KEY` というRepository Actions Secretに一度登録します。Fork先のActionsを有効にし、**Review my public repositories** を実行してください。上の実行/結果リンクは作者のリポジトリ用なので、Forkでは自分のリポジトリのActionsとSecurityを開きます。自分のPagesを公開した場合は、その入口のリンクが自分用に生成されます。
 
-初めて使う方だけ、画面の「読み取りキーを作って保存」を押し、案内に従って公開の登録コードを自分のGitHubへ `REVIEW_AGE_RECIPIENT` として登録します。キー本体をGitHubやチャットへアップロードしないでください。
+作者のAPIキーを共用するサービスではありません。GitHub PATや全リポジトリへの書き込み許可は不要です。利用者ごとに自分のAPI利用料を負担します。
 
-画面取得時はGitHub Pagesへ通信しますが、キー・ZIP・復号結果はアプリから送信せず、ブラウザ内で処理します。Web版は、その時点でサイトから配信されるコードを信頼する必要があります。より厳格な運用には、従来のオフラインHTMLも残しています。
+## チェック範囲と予算
 
-オフライン版は、Actionsの **Offline browser helper → mainの成功した実行 → offline-browser-helper** を保存・展開し、`security-review.html` をChromeで開きます。
+公開・自分所有のリポジトリを毎回自動取得し、未確認のものを優先して**1回最大3件**を選びます。Fork、アーカイブ、中央ツール自身は対象外です。新しいリポジトリの個別登録は不要です。対象・除外・未実施をActionsのSummaryに表示します。
 
-[URL版の公開・利用・信頼条件](docs/HOSTED_VIEWER.md) / [オフライン画面操作](docs/BROWSER_HELPER.md) / [暗号化の設計・CLI手順](docs/ENCRYPTED_RECOVERY.md)
+各件は**最大16ファイル・160 KBの選択レビュー**です。アカウント内の全ファイルを一度に監査するものではありません。認証・権限・外部入力などのファイル名を優先する限定的な選択方式です。前回と同じコミットで選択範囲のレビューが完了している対象はスキップします。
 
-## 回収テスト → 実レビュー
+モデルは `gpt-6.1-sol`。1回合計の見積予算は**1 USD以内・最大3生成**です。APIの請求上限や月額上限ではありません。push/PRで有料AIは呼ばず、手動実行時だけ呼びます。API失敗時は自動再試行しません。標準公開runnerとOpenAI APIは別の料金体系です。
 
-**Security review pilot** は手動実行だけです。
+## 結果の安全性
 
-最初は既定の **recovery-check** でテスト用レポートを作ります。OpenAI APIは呼ばず、APIキーも不要です。実行ページのArtifact `encrypted-review-…` を保存し、画面で読み取りキー、ZIP、実行ページURLを指定して開いてください。番号や長いコマンドの入力は不要です。
+詳細は中央のCode scanningへ送り、公開ログ・公開Artifact・PRコメントには出しません。原本のリポジトリ・コミット・ファイル位置は各アラート本文に記載します。集約用ドキュメントが表示上の位置になるため、対象ファイル上のネイティブな行内注釈や自動修正機能ではありません。
 
-自分のキーで「回収テストに成功しました」と表示されたら、同じworkflowで **mode: review / recovery_confirmed: true** を選びます。専用のOpenAI APIキーを自分のリポジトリのActions Secret `OPENAI_API_KEY` に登録しておく必要があります。上流リポジトリのAPIキー・SecretsはForkへ引き継がれません。
+GitHub runnerとOpenAIは処理中に平文を扱います。中央リポジトリの管理者・書き込み権限・workflow変更管理は信頼境界です。配信失敗やrunner消失時の全文回収は保証しません。AIの指摘は仮説で、未実施・未完了・指摘ゼロは区別します。
 
-**公開されるのは費用等の計測値と暗号文です。詳細な指摘は、URL版の画面・ローカルHTML・CLIで端末内に復号して読みます。** 生の指摘本文・取得ソース・秘密鍵を公開Artifactに置きません。
+[新しい方式の設計と制限](docs/ACCOUNT_REVIEW.md) / [Security方針](SECURITY.md)
 
-## 実測の対象と費用
+## 以前の暗号化方式
 
-初期manifest `benchmarks/pilot.json` は固定コミットから選択した次の3組です。
+既存のオフラインHTML・age鍵・`Security review pilot` は互換性のため残していますが、任意の旧方式です。新しい通常手順では使いません。旧ファイルや鍵を削除する必要はありません。[旧レポートの回収](docs/ENCRYPTED_RECOVERY.md)
 
-| 対象 | 選択ファイル数 | 選択ソース量 |
-| --- | ---: | ---: |
-| usedhonda/statusline | 3 | 6,190 bytes |
-| usedhonda/muse-agent-bridge | 7 | 51,074 bytes |
-| usedhonda/openclaw-artist-runtime | 8 | 137,577 bytes |
+## 開発
 
-モデルは `gpt-6.1-sol`、手動で `gpt-6-astra` も選択可能です。**1回の実行につき見積予算1 USD以下、最大3生成、自動再試行なし**です。生成前に公式入力トークン数と最大出力料金で予約します。価格は記録済みの公表単価に基づく見積もりで、請求書やクレジット残高ではありません。
-
-公開リポジトリの標準 `ubuntu-24.04` runnerを使用します。Actions実行とOpenAI APIは別の費用です。利用可能なAPIクレジットの有効化・残高・適用範囲は本人のOpenAIアカウントで確認してください。Artifactの保持・保存枠にもGitHubの条件が適用されます。無制限の無料保存やAPI無料利用を保証するツールではありません。
-
-アプリの上限は**1回単位**で、月間・アカウント全体の予算ではありません。失敗やタイムアウトで使用量が不明なら未解決の予約額を残し、後続を止めます。不明をゼロや安全と扱わず、盲目的に再実行しないでください。
-
-## 現状と安全性
-
-通常のpush/PRではAPIを呼ばずテストと画面のビルドを行い、mainの画面変更はPagesへ配信します。対象コードを実行せず、固定コミット・ハッシュを検証してテキストとして送ります。選択範囲の欠落、読み取り先の不正、課金条件不明などでは処理を止めます。プロンプトインジェクションや秘匿化対策はbest effortです。
-
-暗号化はage。秘密鍵は端末に残し、公開Artifactには固定名の暗号文だけを保存します。配信失敗やrunner消失時の回収までは保証しません。暗号化は、レビュー中に平文を処理するGitHub runner/OpenAIや、コードを書き換えられる管理者からの保護ではありません。ブランチ保護・権限管理も必要です。
-
-**テスト成功は、本人の実鍵でのGitHub回収や実APIレビュー成功を意味しません。** まず自分の鍵で回収を確認し、その後に実際の品質・費用を評価してください。PR自動実行・PRコメント・再利用workflow・月次予算管理はまだ未実装です。
-
-[セキュリティ方針](SECURITY.md) / [実装修正の記録](docs/SECURITY_AUDIT.md)
-
-## 開発者向けCLI
-
-Python 3.11以上。基本部分は標準ライブラリ、暗号化回収にはage CLIを使用します。
+Python 3.11以上。既存の暗号化互換テストにはage CLIが必要です。
 
 ```sh
 PYTHONPATH=src python3 -m unittest discover -s tests -v
-python3 scripts/fetch_cases.py --manifest benchmarks/pilot.json
-PYTHONPATH=src python3 -m security_review plan --manifest benchmarks/pilot.json --output-dir reports/plan-001
 ```
 
-`plan` はAPIなしの規模見積もりです。実レビューは、専用キーを環境変数に安全に設定した上で `plan` を `run` に変更し、`--model gpt-6.1-sol --max-cost-usd 1.00 --max-calls 3` を指定します。APIキーをコードやシェル履歴へ書かないでください。既存出力の再利用は拒否します。
+中核は `src/security_review/`、自動取得・中央配信は `scripts/account_review.py`、認証境界の合成テストは `scripts/hub_check.py` にあります。
 
-| パス | 内容 |
-| --- | --- |
-| src/security_review/ | 入力検証・API・予算・レポート・暗号化回収 |
-| web/recovery.html | 画面のビルド前ソース |
-| scripts/build_browser_helper.py | SHA固定のageライブラリを内蔵するオフラインHTMLビルド |
-| scripts/build_pages.py | 許可したHTTPS配信先向けの画面ビルド |
-| benchmarks/pilot.json | 固定コミット・ファイル選択 |
-| tests/ | オフライン・暗号化・ブラウザ検証 |
-
-## License
-
-MIT。対象コードは各リポジトリのライセンスに従い、ソースを同梱しません。ブラウザ用Typageと依存ライブラリのライセンスは配布HTMLに同梱します。
+MIT。対象コードは各リポジトリのライセンスに従います。

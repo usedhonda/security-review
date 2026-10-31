@@ -1,0 +1,87 @@
+name: Review my public repositories
+
+# Push runs only the API-free inventory/readiness check. AI calls are manual only.
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/account-review.yml'
+      - 'scripts/account_review.py'
+      - 'tests/test_account_review.py'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: account-security-review
+  cancel-in-progress: false
+
+jobs:
+  review:
+    if: github.event.repository.visibility == 'public' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    permissions:
+      contents: read
+      security-events: write
+    env:
+      PYTHONPATH: src
+      PYTHONUNBUFFERED: '1'
+      DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+    steps:
+      - name: Checkout the trusted default-branch revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Test discovery and result boundaries without credentials
+        run: |
+          python3 -m unittest discover -s tests -p test_hub_check.py -v
+          python3 -m unittest discover -s tests -p test_account_review.py -v
+      - name: Refuse blind reruns of billable attempts
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          if [[ "$GITHUB_RUN_ATTEMPT" != '1' ]]; then
+            echo '::error::Inspect the prior usage first. Start a new manual run only after checking the previous attempt.'
+            exit 1
+          fi
+      - name: Discover public repositories and verify the central inbox
+        id: prepare
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python3 scripts/account_review.py prepare
+      - name: Verify the existing OpenAI secret before paid inference
+        if: github.event_name == 'workflow_dispatch' && steps.prepare.outputs.has_cases == 'true'
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          if [[ -z "$OPENAI_API_KEY" ]]; then
+            echo '::error::OPENAI_API_KEY is not available to this repository workflow. No AI request has been made. Check the existing key name/scope in this repository, not a GitHub PAT or reading key.'
+            exit 1
+          fi
+      - name: Fetch pinned public files without executing them
+        if: github.event_name == 'workflow_dispatch' && steps.prepare.outputs.has_cases == 'true'
+        timeout-minutes: 3
+        run: python3 scripts/fetch_cases.py --manifest .work/account/manifest.json
+      - name: Review up to three repositories within the existing USD 1 estimate
+        id: inference
+        if: github.event_name == 'workflow_dispatch' && steps.prepare.outputs.has_cases == 'true'
+        timeout-minutes: 15
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          python3 -m security_review run \
+            --manifest .work/account/manifest.json \
+            --output-dir .work/account/report \
+            --model gpt-6.1-sol --max-cost-usd 1.00 --max-calls 3
+      - name: Deliver completed findings to the central Security inbox
+        if: always() && steps.inference.outcome != 'skipped' && steps.prepare.outcome == 'success'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python3 scripts/account_review.py publish
+      - name: Publish only counts, costs, selection states and inbox links
+        if: always()
+        run: python3 scripts/account_review.py summary
+      - name: Remove local plaintext and downloaded source
+        if: always()
+        run: rm -rf -- "$GITHUB_WORKSPACE/.work/account" "$GITHUB_WORKSPACE/.work/sources"
