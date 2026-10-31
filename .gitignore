@@ -1,0 +1,19 @@
+# Credentials and local authentication state
+.env
+.env.*
+*.pem
+*.key
+auth.json
+credentials.json
+
+# Downloaded source, reports, local environments and builds
+.work/
+reports/
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.DS_Store
+

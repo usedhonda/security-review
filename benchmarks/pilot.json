@@ -1,0 +1,147 @@
+{
+  "schema_version": 1,
+  "description": "Manual pilot on explicitly selected files from three public repositories. Not a full-repository security audit.",
+  "cases": [
+    {
+      "id": "small-statusline-install",
+      "repository": "usedhonda/statusline",
+      "commit": "cfded6b005e8ca321d292e15ef3e051d588dfe33",
+      "mode": "snapshot",
+      "source_root": "../.work/sources/statusline-cfded6b",
+      "max_source_bytes": 8000,
+      "context": "Review the installer and CI/release permissions for a Python terminal statusline tool. Only these selected files are available; the main statusline.py implementation is outside this sample. Identify concrete risks reachable from installation or this CI configuration. State missing implementation context instead of guessing.",
+      "inventory": {
+        "basis": "GitHub recursive tree at pinned commit; file bytes are not token counts",
+        "git_blob_files": 12,
+        "git_blob_bytes": 466918,
+        "selected_file_bytes": 6190
+      },
+      "files": [
+        {
+          "path": "install.py",
+          "git_blob_sha": "2f1d1b9f10570e3ebaf6d751970356e646e16124",
+          "sha256": "52a7b2caf4d2646d7f6283fdf0f71c17cfdfa852f5ea10eafdb1c65dd4e15be1"
+        },
+        {
+          "path": ".github/workflows/ci.yml",
+          "git_blob_sha": "318fbdcdbb20e29fa50eaf8b30b1c602a2d7fbd1",
+          "sha256": "8f0ade7f3108b77b381845c0cff0e4f1bb82f18b496877e906d8c659c80b5666"
+        },
+        {
+          "path": "pyproject.toml",
+          "git_blob_sha": "08423de49f841479d5ab1bf0a884d4bbe57f5f23",
+          "sha256": "2b4a5bcc13019c650af34d2b9fbe5a54d9bf732073d157acf30816019fca15dc"
+        }
+      ]
+    },
+    {
+      "id": "medium-muse-bridge",
+      "repository": "usedhonda/muse-agent-bridge",
+      "commit": "306b061cf01c5edcfa1e01da6c122044b7638041",
+      "mode": "snapshot",
+      "source_root": "../.work/sources/muse-agent-bridge-306b061",
+      "max_source_bytes": 64000,
+      "context": "Review selected Slack/agent bridge boundary and worker files. Consider authentication, authorization, external inputs, shell/process calls, file access, and data sent to external services. bridge_core and deployment configuration are outside this sample. Findings must be supported by these sources and name any required environmental assumptions.",
+      "inventory": {
+        "basis": "GitHub recursive tree at pinned commit; file bytes are not token counts",
+        "git_blob_files": 65,
+        "git_blob_bytes": 518348,
+        "selected_file_bytes": 51074
+      },
+      "files": [
+        {
+          "path": "bridge/config.py",
+          "git_blob_sha": "08eca203854798208d7aa104274651abfcacf2f1",
+          "sha256": "1be18cb054b0e85cf5438f6b769cb6c6871dbda64a884a98187e6964f92434ff"
+        },
+        {
+          "path": "bridge/audience.py",
+          "git_blob_sha": "1b1019263de043895165b14564af69964cc0bd77",
+          "sha256": "014ba4220ba5eda1bf1d5d39e77509873602d4da570c5497687778dda7dbf28a"
+        },
+        {
+          "path": "bridge/intake.py",
+          "git_blob_sha": "1b404e3ffd52e97d2e978d7cc423d1c7414f5f88",
+          "sha256": "bba5e1cfeb0b66986e0a055bc554690ff3be1bebb45753fe72b3f45a1c757b04"
+        },
+        {
+          "path": "bridge/listener.py",
+          "git_blob_sha": "3ae3793f66eb6f18b42ba68449543a2f398e91fc",
+          "sha256": "930d41e350553e1377540cf1da60130bf7b28d581d680c70f51106b4ec9cfce2"
+        },
+        {
+          "path": "bridge/webapi.py",
+          "git_blob_sha": "e4ebda85f42933ae4747f0fb4ce8b03e2c6b4bad",
+          "sha256": "62bd7d8ca89b48432980a38d42a4cfed200431cae9a0b7ad7001bad3ba33a956"
+        },
+        {
+          "path": "bridge/transport.py",
+          "git_blob_sha": "8fc5eeeb3d68b83bd74800d556af0a19d2e3882a",
+          "sha256": "2887a064a930772312f91a6856f8570162b7bf14b9ef94f16a5c5dcf38d935c7"
+        },
+        {
+          "path": "bridge/worker.py",
+          "git_blob_sha": "a7d02ca6e3cf4c9053b04684aa074967bf67501d",
+          "sha256": "307df38da881026c2df7643422c5b18f33138c4c2dbb80168de8f30a6c53873d"
+        }
+      ]
+    },
+    {
+      "id": "large-artist-runtime",
+      "repository": "usedhonda/openclaw-artist-runtime",
+      "commit": "54b849b1d148491c4e01fc14da6991ceb27c2a1c",
+      "mode": "snapshot",
+      "source_root": "../.work/sources/openclaw-artist-runtime-54b849b",
+      "max_source_bytes": 160000,
+      "context": "Review selected HTTP routes, SSRF/network controls, runtime configuration, Telegram authorization and command routing for an artist automation runtime. UI, most services, route response builders and deployment middleware are outside this sample. Focus on concrete trust-boundary violations; do not assume an unprovided outer authentication layer is absent. Explain prerequisites and missing context.",
+      "inventory": {
+        "basis": "GitHub recursive tree at pinned commit; file bytes are not token counts",
+        "git_blob_files": 860,
+        "git_blob_bytes": 6246515,
+        "selected_file_bytes": 137577
+      },
+      "files": [
+        {
+          "path": "src/routes/index.ts",
+          "git_blob_sha": "a12a5af1468f84ffb74d2e6fe4be8c9a9a212a62",
+          "sha256": "798cb96ed6d6a48ae7ed24f303c18c550bda88c289cbc4aff26205b09e7c7cc0"
+        },
+        {
+          "path": "src/routes/payloadHelpers.ts",
+          "git_blob_sha": "5df87ac6c167f163cfa6166cadfdec774396009f",
+          "sha256": "a1c9a11875d42414e4907e61d257e947746c86247395a35294ad5b0ea74cce71"
+        },
+        {
+          "path": "src/routes/runtimeEventStream.ts",
+          "git_blob_sha": "a3976a2e8963b311af0ba2b6604395453200c06d",
+          "sha256": "d72576e0c7dd0b218958aecf522b344a49d7eceec21a8b717b309cb0c1d842d9"
+        },
+        {
+          "path": "src/services/ssrfGuard.ts",
+          "git_blob_sha": "51fb46e9c711cbb11e4642df14cf35438b9e7f07",
+          "sha256": "6435b41737714cca88c15d0de7ab7a175626bb430051e93f80e877303da86a6e"
+        },
+        {
+          "path": "src/services/runtimeConfig.ts",
+          "git_blob_sha": "5268d926345d54e5201b99beb28a918006290fab",
+          "sha256": "293ee6046bc60ece5e709558b45458c51dbfb67f89531e66b9ab6c29fce59c84"
+        },
+        {
+          "path": "src/services/telegramAuth.ts",
+          "git_blob_sha": "a11acf6691fff9b6fd0812e6d4e00547debb35f7",
+          "sha256": "ec78d1f643cad52e2f53b7e8a5735a351af03f4c2cf4a94f32096ed95be32e6e"
+        },
+        {
+          "path": "src/services/telegramOutboundNetwork.ts",
+          "git_blob_sha": "28ee2fb42a063456f26b344da556510764129b08",
+          "sha256": "0eb424552cc27e61a0ba81064122199c9b5653cfc196d0c91a3c6cfb5f08f97b"
+        },
+        {
+          "path": "src/services/telegramCommandRouter.ts",
+          "git_blob_sha": "3186661209523495b158f527febfc5ef3a46b51e",
+          "sha256": "258d32b55296fe3c2842f98bc2f6b20f09d3ee561e9f15fcb8398f0bda9c0d88"
+        }
+      ]
+    }
+  ]
+}

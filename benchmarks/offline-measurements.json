@@ -1,0 +1,405 @@
+{
+  "schema_version": 1,
+  "status": "offline_measurement_only",
+  "measured_at": "2026-10-31T09:11:18.016734+00:00",
+  "api_generation_calls": 0,
+  "actual_api_tokens": null,
+  "actual_api_cost_usd": null,
+  "note": "Source bytes and lines measured locally from verified pinned public files. Planning token counts and prices are conservative byte-based estimates, not API measurements.",
+  "pricing": {
+    "currency": "USD",
+    "unit": "per_million_tokens",
+    "service_tier": "standard",
+    "reasoning_mode": "standard",
+    "input": "2",
+    "output": "10",
+    "cached_input": "0.1",
+    "cache_write_30m_multiplier": "1.25",
+    "cache_write_12h_multiplier": "2.5",
+    "cache_mode": "disabled_explicit_without_breakpoints",
+    "cache_pricing_source": "https://developers.openai.com/api/docs/guides/prompt-caching",
+    "verified_date": "2026-10-31",
+    "source": "https://developers.openai.com/api/docs/pricing",
+    "maximum_input_tokens": 128000
+  },
+  "cases": [
+    {
+      "id": "small-statusline-install",
+      "repository": "usedhonda/statusline",
+      "commit": "cfded6b005e8ca321d292e15ef3e051d588dfe33",
+      "coverage": {
+        "basis": "explicitly_selected_files_and_ranges; not_entire_repository",
+        "requested_files": 3,
+        "included_files": 3,
+        "source_bytes": 6190,
+        "source_lines": 207,
+        "selected_bytes": 6190,
+        "selected_lines": 207,
+        "included_bytes": 6190,
+        "included_lines": 207,
+        "complete_for_selection": true,
+        "redactions": 0,
+        "files": [
+          {
+            "path": "install.py",
+            "source_bytes": 3056,
+            "source_lines": 92,
+            "selected_bytes": 3056,
+            "selected_lines": 92,
+            "included_bytes": 3056,
+            "included_lines": 92,
+            "included_ranges": [
+              [
+                1,
+                92
+              ]
+            ],
+            "sha256": "52a7b2caf4d2646d7f6283fdf0f71c17cfdfa852f5ea10eafdb1c65dd4e15be1",
+            "status": "included"
+          },
+          {
+            "path": ".github/workflows/ci.yml",
+            "source_bytes": 1692,
+            "source_lines": 64,
+            "selected_bytes": 1692,
+            "selected_lines": 64,
+            "included_bytes": 1692,
+            "included_lines": 64,
+            "included_ranges": [
+              [
+                1,
+                64
+              ]
+            ],
+            "sha256": "8f0ade7f3108b77b381845c0cff0e4f1bb82f18b496877e906d8c659c80b5666",
+            "status": "included"
+          },
+          {
+            "path": "pyproject.toml",
+            "source_bytes": 1442,
+            "source_lines": 51,
+            "selected_bytes": 1442,
+            "selected_lines": 51,
+            "included_bytes": 1442,
+            "included_lines": 51,
+            "included_ranges": [
+              [
+                1,
+                51
+              ]
+            ],
+            "sha256": "2b4a5bcc13019c650af34d2b9fbe5a54d9bf732073d157acf30816019fca15dc",
+            "status": "included"
+          }
+        ],
+        "selected_byte_fraction": 1.0
+      },
+      "estimated_input_tokens": 16460,
+      "estimate_method": "utf8_payload_bytes_plus_4096; planning_only",
+      "estimated_max_cost_usd": "0.09292000"
+    },
+    {
+      "id": "medium-muse-bridge",
+      "repository": "usedhonda/muse-agent-bridge",
+      "commit": "306b061cf01c5edcfa1e01da6c122044b7638041",
+      "coverage": {
+        "basis": "explicitly_selected_files_and_ranges; not_entire_repository",
+        "requested_files": 7,
+        "included_files": 7,
+        "source_bytes": 51074,
+        "source_lines": 1068,
+        "selected_bytes": 51074,
+        "selected_lines": 1068,
+        "included_bytes": 51074,
+        "included_lines": 1068,
+        "complete_for_selection": true,
+        "redactions": 0,
+        "files": [
+          {
+            "path": "bridge/config.py",
+            "source_bytes": 4593,
+            "source_lines": 112,
+            "selected_bytes": 4593,
+            "selected_lines": 112,
+            "included_bytes": 4593,
+            "included_lines": 112,
+            "included_ranges": [
+              [
+                1,
+                112
+              ]
+            ],
+            "sha256": "1be18cb054b0e85cf5438f6b769cb6c6871dbda64a884a98187e6964f92434ff",
+            "status": "included"
+          },
+          {
+            "path": "bridge/audience.py",
+            "source_bytes": 2105,
+            "source_lines": 60,
+            "selected_bytes": 2105,
+            "selected_lines": 60,
+            "included_bytes": 2105,
+            "included_lines": 60,
+            "included_ranges": [
+              [
+                1,
+                60
+              ]
+            ],
+            "sha256": "014ba4220ba5eda1bf1d5d39e77509873602d4da570c5497687778dda7dbf28a",
+            "status": "included"
+          },
+          {
+            "path": "bridge/intake.py",
+            "source_bytes": 1466,
+            "source_lines": 28,
+            "selected_bytes": 1466,
+            "selected_lines": 28,
+            "included_bytes": 1466,
+            "included_lines": 28,
+            "included_ranges": [
+              [
+                1,
+                28
+              ]
+            ],
+            "sha256": "bba5e1cfeb0b66986e0a055bc554690ff3be1bebb45753fe72b3f45a1c757b04",
+            "status": "included"
+          },
+          {
+            "path": "bridge/listener.py",
+            "source_bytes": 6962,
+            "source_lines": 171,
+            "selected_bytes": 6962,
+            "selected_lines": 171,
+            "included_bytes": 6962,
+            "included_lines": 171,
+            "included_ranges": [
+              [
+                1,
+                171
+              ]
+            ],
+            "sha256": "930d41e350553e1377540cf1da60130bf7b28d581d680c70f51106b4ec9cfce2",
+            "status": "included"
+          },
+          {
+            "path": "bridge/webapi.py",
+            "source_bytes": 4263,
+            "source_lines": 94,
+            "selected_bytes": 4263,
+            "selected_lines": 94,
+            "included_bytes": 4263,
+            "included_lines": 94,
+            "included_ranges": [
+              [
+                1,
+                94
+              ]
+            ],
+            "sha256": "62bd7d8ca89b48432980a38d42a4cfed200431cae9a0b7ad7001bad3ba33a956",
+            "status": "included"
+          },
+          {
+            "path": "bridge/transport.py",
+            "source_bytes": 3018,
+            "source_lines": 86,
+            "selected_bytes": 3018,
+            "selected_lines": 86,
+            "included_bytes": 3018,
+            "included_lines": 86,
+            "included_ranges": [
+              [
+                1,
+                86
+              ]
+            ],
+            "sha256": "2887a064a930772312f91a6856f8570162b7bf14b9ef94f16a5c5dcf38d935c7",
+            "status": "included"
+          },
+          {
+            "path": "bridge/worker.py",
+            "source_bytes": 28667,
+            "source_lines": 517,
+            "selected_bytes": 28667,
+            "selected_lines": 517,
+            "included_bytes": 28667,
+            "included_lines": 517,
+            "included_ranges": [
+              [
+                1,
+                517
+              ]
+            ],
+            "sha256": "307df38da881026c2df7643422c5b18f33138c4c2dbb80168de8f30a6c53873d",
+            "status": "included"
+          }
+        ],
+        "selected_byte_fraction": 1.0
+      },
+      "estimated_input_tokens": 71753,
+      "estimate_method": "utf8_payload_bytes_plus_4096; planning_only",
+      "estimated_max_cost_usd": "0.20350600"
+    },
+    {
+      "id": "large-artist-runtime",
+      "repository": "usedhonda/openclaw-artist-runtime",
+      "commit": "54b849b1d148491c4e01fc14da6991ceb27c2a1c",
+      "coverage": {
+        "basis": "explicitly_selected_files_and_ranges; not_entire_repository",
+        "requested_files": 8,
+        "included_files": 8,
+        "source_bytes": 137577,
+        "source_lines": 3297,
+        "selected_bytes": 137577,
+        "selected_lines": 3297,
+        "included_bytes": 137577,
+        "included_lines": 3297,
+        "complete_for_selection": true,
+        "redactions": 0,
+        "files": [
+          {
+            "path": "src/routes/index.ts",
+            "source_bytes": 30702,
+            "source_lines": 728,
+            "selected_bytes": 30702,
+            "selected_lines": 728,
+            "included_bytes": 30702,
+            "included_lines": 728,
+            "included_ranges": [
+              [
+                1,
+                728
+              ]
+            ],
+            "sha256": "798cb96ed6d6a48ae7ed24f303c18c550bda88c289cbc4aff26205b09e7c7cc0",
+            "status": "included"
+          },
+          {
+            "path": "src/routes/payloadHelpers.ts",
+            "source_bytes": 4327,
+            "source_lines": 103,
+            "selected_bytes": 4327,
+            "selected_lines": 103,
+            "included_bytes": 4327,
+            "included_lines": 103,
+            "included_ranges": [
+              [
+                1,
+                103
+              ]
+            ],
+            "sha256": "a1c9a11875d42414e4907e61d257e947746c86247395a35294ad5b0ea74cce71",
+            "status": "included"
+          },
+          {
+            "path": "src/routes/runtimeEventStream.ts",
+            "source_bytes": 2421,
+            "source_lines": 74,
+            "selected_bytes": 2421,
+            "selected_lines": 74,
+            "included_bytes": 2421,
+            "included_lines": 74,
+            "included_ranges": [
+              [
+                1,
+                74
+              ]
+            ],
+            "sha256": "d72576e0c7dd0b218958aecf522b344a49d7eceec21a8b717b309cb0c1d842d9",
+            "status": "included"
+          },
+          {
+            "path": "src/services/ssrfGuard.ts",
+            "source_bytes": 7286,
+            "source_lines": 197,
+            "selected_bytes": 7286,
+            "selected_lines": 197,
+            "included_bytes": 7286,
+            "included_lines": 197,
+            "included_ranges": [
+              [
+                1,
+                197
+              ]
+            ],
+            "sha256": "6435b41737714cca88c15d0de7ab7a175626bb430051e93f80e877303da86a6e",
+            "status": "included"
+          },
+          {
+            "path": "src/services/runtimeConfig.ts",
+            "source_bytes": 26261,
+            "source_lines": 615,
+            "selected_bytes": 26261,
+            "selected_lines": 615,
+            "included_bytes": 26261,
+            "included_lines": 615,
+            "included_ranges": [
+              [
+                1,
+                615
+              ]
+            ],
+            "sha256": "293ee6046bc60ece5e709558b45458c51dbfb67f89531e66b9ab6c29fce59c84",
+            "status": "included"
+          },
+          {
+            "path": "src/services/telegramAuth.ts",
+            "source_bytes": 1282,
+            "source_lines": 33,
+            "selected_bytes": 1282,
+            "selected_lines": 33,
+            "included_bytes": 1282,
+            "included_lines": 33,
+            "included_ranges": [
+              [
+                1,
+                33
+              ]
+            ],
+            "sha256": "ec78d1f643cad52e2f53b7e8a5735a351af03f4c2cf4a94f32096ed95be32e6e",
+            "status": "included"
+          },
+          {
+            "path": "src/services/telegramOutboundNetwork.ts",
+            "source_bytes": 2658,
+            "source_lines": 55,
+            "selected_bytes": 2658,
+            "selected_lines": 55,
+            "included_bytes": 2658,
+            "included_lines": 55,
+            "included_ranges": [
+              [
+                1,
+                55
+              ]
+            ],
+            "sha256": "0eb424552cc27e61a0ba81064122199c9b5653cfc196d0c91a3c6cfb5f08f97b",
+            "status": "included"
+          },
+          {
+            "path": "src/services/telegramCommandRouter.ts",
+            "source_bytes": 62640,
+            "source_lines": 1492,
+            "selected_bytes": 62640,
+            "selected_lines": 1492,
+            "included_bytes": 62640,
+            "included_lines": 1492,
+            "included_ranges": [
+              [
+                1,
+                1492
+              ]
+            ],
+            "sha256": "258d32b55296fe3c2842f98bc2f6b20f09d3ee561e9f15fcb8398f0bda9c0d88",
+            "status": "included"
+          }
+        ],
+        "selected_byte_fraction": 1.0
+      },
+      "estimated_input_tokens": 178319,
+      "estimate_method": "utf8_payload_bytes_plus_4096; planning_only",
+      "estimated_max_cost_usd": "0.41663800"
+    }
+  ]
+}

@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "security-review-lab"
+version = "0.1.0"
+description = "Small, bounded experiments for AI security review of pinned public source code"
+requires-python = ">=3.11"
+license = "MIT"
+readme = "README.md"
+authors = [{name = "Ken Honda"}]
+dependencies = []
+
+[project.scripts]
+security-review-lab = "security_review_lab.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+

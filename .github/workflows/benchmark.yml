@@ -1,0 +1,146 @@
+name: Security review pilot
+
+# Paid API calls only run when a repository maintainer starts this workflow.
+on:
+  workflow_dispatch:
+    inputs:
+      model:
+        description: OpenAI model for this pilot
+        required: true
+        type: choice
+        default: gpt-6.1-sol
+        options:
+          - gpt-6.1-sol
+          - gpt-6-astra
+      max_cost_usd:
+        description: Maximum estimated API spend for this run (0 < amount <= 1.00 USD)
+        required: true
+        type: string
+        default: "1.00"
+
+permissions:
+  contents: read
+
+# Keep the shared budget ledger in one process and allow each run to finish.
+concurrency:
+  group: security-review-pilot
+  cancel-in-progress: false
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      PYTHONPATH: src
+      PYTHONUNBUFFERED: "1"
+    steps:
+      - name: Require the default branch
+        env:
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          if [[ "$GITHUB_REF" != "refs/heads/$DEFAULT_BRANCH" ]]; then
+            echo "::error::Run this workflow from the repository's default branch."
+            exit 1
+          fi
+
+      - name: Check out the dispatched revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Verify the Python runtime and spending limit
+        env:
+          BENCHMARK_BUDGET: ${{ inputs.max_cost_usd }}
+        run: |
+          python3 - <<'PY'
+          import os
+          import sys
+          from decimal import Decimal, InvalidOperation
+
+          if sys.version_info < (3, 11):
+              raise SystemExit("Python 3.11+ is required")
+          try:
+              budget = Decimal(os.environ["BENCHMARK_BUDGET"])
+          except InvalidOperation:
+              raise SystemExit("The spending limit must be a number")
+          if not budget.is_finite() or not Decimal("0") < budget <= Decimal("1.00"):
+              raise SystemExit("The spending limit must be greater than 0 and at most 1.00 USD")
+          PY
+
+      - name: Verify the API secret is configured
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          if [[ -z "$OPENAI_API_KEY" ]]; then
+            echo "::error::Add the OPENAI_API_KEY repository Actions secret before running the pilot."
+            exit 1
+          fi
+
+      - name: Fetch pinned public source samples
+        timeout-minutes: 2
+        run: python3 scripts/fetch_cases.py --manifest benchmarks/pilot.json
+
+      - name: Review the pilot samples
+        id: review
+        timeout-minutes: 6
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          BENCHMARK_MODEL: ${{ inputs.model }}
+          BENCHMARK_BUDGET: ${{ inputs.max_cost_usd }}
+        run: |
+          python3 -m security_review_lab run \
+            --manifest benchmarks/pilot.json \
+            --output-dir reports/pilot \
+            --model "$BENCHMARK_MODEL" \
+            --max-cost-usd "$BENCHMARK_BUDGET" \
+            --max-calls 3
+
+      - name: Preserve an incomplete status when no benchmark report exists
+        if: always()
+        env:
+          REVIEW_OUTCOME: ${{ steps.review.outcome }}
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          report_dir = Path("reports/pilot")
+          report_dir.mkdir(parents=True, exist_ok=True)
+          json_path = report_dir / "summary.json"
+          markdown_path = report_dir / "summary.md"
+          if not json_path.exists():
+              skipped = os.environ.get("REVIEW_OUTCOME", "skipped") in ("", "skipped")
+              payload = {
+                  "schema_version": 1,
+                  "status": "not_run" if skipped else "incomplete",
+                  "reason": "No benchmark report was produced; see the workflow step status.",
+                  "review_step_outcome": os.environ.get("REVIEW_OUTCOME", "skipped"),
+                  "actual_usage": None,
+                  "actual_cost_usd": None,
+                  "cost_status": "not_called" if skipped else "unknown",
+              }
+              json_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+          if not markdown_path.exists():
+              markdown_path.write_text(
+                  "# Pilot did not produce a complete report\n\n"
+                  "No security conclusion can be drawn from this run. See the workflow step status.\n\n"
+                  "Token usage and cost are unavailable; do not interpret missing values as zero.\n",
+                  encoding="utf-8",
+              )
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as summary:
+              summary.write(markdown_path.read_text(encoding="utf-8"))
+          PY
+
+      - name: Save sanitized cost and result summaries
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: security-review-pilot-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            reports/pilot/summary.json
+            reports/pilot/summary.md
+          if-no-files-found: error
+          retention-days: 7
+          include-hidden-files: false
