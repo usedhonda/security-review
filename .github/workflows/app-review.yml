@@ -1,0 +1,25 @@
+name: GitHub App AI security review
+on:
+  repository_dispatch:
+    types: [security-review-app-v1]
+permissions:
+  contents: read
+  security-events: write
+jobs:
+  app-review:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    concurrency:
+      group: app-review-${{ github.event.client_payload.delivery }}
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Review changed public source with central API key
+        env:
+          PYTHONPATH: src:scripts
+          GITHUB_TOKEN: ${{ github.token }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          GITHUB_OWNER: usedhonda
+        run: python3 scripts/app_dispatch.py
