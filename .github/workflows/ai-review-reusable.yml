@@ -15,6 +15,7 @@ on:
 permissions:
   contents: read
   pull-requests: read
+  checks: read
   security-events: write
 
 concurrency:
@@ -31,7 +32,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: usedhonda/security-review
-          ref: e84257da24ca62a93a25f5da6fab570459fae30d
+          ref: c262f9dcd7d08a19ae3936e109f11d6dd9f4caac
           path: review-engine
           persist-credentials: false
       - name: Verify event boundaries without credentials
