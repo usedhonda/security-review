@@ -9,11 +9,12 @@ on:
 permissions:
   contents: read
   pull-requests: read
+  checks: read
   security-events: write
 
 jobs:
   ai-review:
-    uses: usedhonda/security-review/.github/workflows/ai-review-reusable.yml@a1c056843312ad9e61da3c5b6069130d4193e3b1
+    uses: usedhonda/security-review/.github/workflows/ai-review-reusable.yml@b8fa99fd526f9d37cdb8f4d29a671a826abf7a8e
     with:
       max_cost_usd: '0.50'
     secrets:
