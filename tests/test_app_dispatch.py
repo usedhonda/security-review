@@ -1,5 +1,8 @@
+import sys
 import unittest
-from scripts.app_dispatch import validate
+from pathlib import Path
+sys.path.insert(0,str(Path(__file__).resolve().parents[1]/"scripts"))
+from app_dispatch import validate
 from review_event import EventError
 
 GOOD={"action":"security-review-app-v1","client_payload":{"kind":"pull_request","repository":"usedhonda/demo","repository_id":123,"branch":"main","base":"a"*40,"head":"b"*40,"pr":17,"delivery":"4fc0896e-0bea-49b8-9005-f3e21ec89fff"}}
