@@ -33,8 +33,10 @@ def comparison(files):
     return {'base_commit': {'sha': BASE}, 'commits': [{'sha': HEAD}], 'total_commits': 1, 'files': files}
 
 
-def file_row(path='src/a.py', status='modified', blob='c' * 40):
-    return {'filename': path, 'status': status, 'sha': blob}
+def file_row(path='src/a.py', status='modified', blob='c' * 40,
+             patch='@@ -1 +1 @@\n-old\n+raise RuntimeError("must never be executed")'):
+    return {'filename': path, 'status': status, 'sha': blob,
+            'patch': patch, 'additions': 1, 'deletions': 1}
 
 
 class Client:
@@ -131,17 +133,93 @@ class EventTests(unittest.TestCase):
             case = json.loads(manifest.read_text())['cases'][0]
             self.assertEqual(case['commit'], HEAD)
             self.assertEqual(coverage['bytes'], len(data))
+            self.assertEqual(case['mode'], 'diff')
+            self.assertEqual(case['base_commit'], BASE)
+            self.assertEqual(case['files'][0]['line_ranges'], [[1, 1]])
             self.assertEqual((Path(d) / 'source/src/a.py').read_bytes(), data)
 
     def test_symlink_and_size_limit_stop_before_blob_download(self):
         root = '/repos/' + REPO
-        for mode, size in [('120000', 10), ('100644', m.MAX_BYTES + 1)]:
+        for mode, size in [('120000', 10), ('100644', m.MAX_SOURCE_FILE_BYTES + 1)]:
             client = Client({root + '/compare/' + BASE + '...' + HEAD: (200, comparison([file_row()])),
                 root + '/git/trees/' + HEAD + '?recursive=1': (200, {'truncated': False, 'tree': [
                     {'path': 'src/a.py', 'type': 'blob', 'mode': mode, 'size': size, 'sha': 'c' * 40}]})})
             with tempfile.TemporaryDirectory() as d:
                 with self.assertRaises(m.EventError): m.collect(client, m.event_scope(event(), env()), Path(d))
             self.assertFalse(any('/git/blobs/' in x for x in client.paths))
+
+    def test_diff_ranges_limit_context_not_whole_file(self):
+        source = ''.join('line-%03d\n' % i for i in range(1, 301))
+        patch_text = '@@ -200 +200 @@\n-old-line\n+line-200'
+        row = file_row(patch=patch_text)
+        ranges, size = m.head_diff_ranges(row, source)
+        self.assertEqual(ranges, [[194, 206]])
+        self.assertEqual(size, len(''.join(source.splitlines(keepends=True)[193:206]).encode()))
+        self.assertLess(size, len(source) // 10)
+
+    def test_multihunk_diff_and_adjacent_deletion(self):
+        source = ''.join('line-%03d\n' % i for i in range(1, 101))
+        patch_text = ('@@ -10 +10 @@\n-old\n+line-010\n'
+                      '@@ -75,2 +75 @@\n-removed\n line-075')
+        row = file_row(patch=patch_text); row['additions'] = 1; row['deletions'] = 2
+        ranges, _ = m.head_diff_ranges(row, source)
+        self.assertEqual(ranges, [[4, 16], [69, 81]])
+
+    def test_truncated_or_tampered_diff_is_rejected(self):
+        source = 'alpha\nbeta\ngamma\n'
+        good = '@@ -2 +2 @@\n-old\n+beta'
+        for bad in [None, '', good[:-1], '@@ -2,2 +2,2 @@\n-old\n+beta',
+                    '@@ -2 +2 @@\n-old\n+not-beta']:
+            row = file_row(patch=bad)
+            if bad is None or bad == '':
+                with self.assertRaises(m.EventError):
+                    m.changed_source(m.event_scope(event(), env()), comparison([row]))
+            else:
+                with self.assertRaises(m.EventError):
+                    m.head_diff_ranges(row, source)
+        row = file_row(patch=good); row['additions'] = 2
+        with self.assertRaises(m.EventError): m.head_diff_ranges(row, source)
+
+    def test_deletion_only_diff_gets_surviving_context(self):
+        row = file_row(patch='@@ -3,2 +3 @@\n-deleted\n gamma')
+        row['additions'] = 0; row['deletions'] = 1
+        ranges, _ = m.head_diff_ranges(row, 'alpha\nbeta\ngamma\ndelta\n')
+        self.assertEqual(ranges, [[1, 4]])
+
+    def test_merged_pr_reuses_completed_ai_check_without_new_charge(self):
+        e = event(); e.update(before=BASE, after=HEAD, ref='refs/heads/main')
+        v = env(); v['GITHUB_EVENT_NAME'] = 'push'
+        scope = m.event_scope(e, v)
+        root = '/repos/' + REPO
+        previous = 'c' * 40
+        pr = {'merged_at': '2026-11-01T00:00:00Z', 'merge_commit_sha': HEAD,
+              'head': {'sha': previous, 'repo': {'full_name': REPO}},
+              'base': {'ref': 'main'}, 'user': {'login': 'alice'}, 'number': 7}
+        check = {'name': 'ai-review / Review changed code with AI',
+                 'head_sha': previous, 'status': 'completed', 'conclusion': 'success',
+                 'app': {'slug': 'github-actions'}}
+        responses = {
+            root + '/commits/' + HEAD + '/pulls?per_page=100': (200, [pr]),
+            root + '/commits/' + previous + '/check-runs?per_page=100':
+                (200, {'total_count': 1, 'check_runs': [check]})}
+        result, code = m.merge_pr_verdict(Client(responses), scope)
+        self.assertEqual((result['state'], result['calls'], code),
+                         ('prior_pr_check_reused', 0, 0))
+        check['conclusion'] = 'failure'
+        result, code = m.merge_pr_verdict(Client(responses), scope)
+        self.assertEqual(code, 1)
+        check['conclusion'] = 'cancelled'
+        self.assertIsNone(m.merge_pr_verdict(Client(responses), scope))
+        check['conclusion'] = 'success'; check['head_sha'] = 'd' * 40
+        self.assertIsNone(m.merge_pr_verdict(Client(responses), scope))
+
+    def test_raw_main_push_still_goes_through_ai(self):
+        e = event(); e.update(before=BASE, after=HEAD, ref='refs/heads/main')
+        v = env(); v['GITHUB_EVENT_NAME'] = 'push'
+        scope = m.event_scope(e, v)
+        self.assertIsNone(m.merge_pr_verdict(Client({
+            '/repos/' + REPO + '/commits/' + HEAD + '/pulls?per_page=100': (200, [])
+        }), scope))
 
     def test_stale_pr_cannot_overwrite_latest_verdict(self):
         client = Client({'/repos/' + REPO + '/pulls/7': (200, {'state': 'open', 'head': {'sha': 'd' * 40}, 'base': {'sha': BASE}})})
